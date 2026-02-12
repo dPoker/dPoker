@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>🂡 <strong>AceGuard</strong> — Adversarial Bot Detection Subnet</h1>
-  <img src="Aceguard/assets/Aceguard.png" alt="AceGuard logo" style="width:280px;height:280px;">
+  <h1>🂡 <strong>dPoker</strong> — Adversarial Bot Detection Subnet</h1>
+  <img src="dPoker/assets/dPoker.png" alt="dPoker logo" style="width:280px;height:280px;">
   <p>
     <a href="docs/validator.md">🔐 Validator Guide</a> &bull;
     <a href="docs/miner.md">🛠️ Miner Guide</a> &bull;
@@ -10,14 +10,14 @@
 
 ---
 
-## What is AceGuard?
+## What is dPoker?
 
-AceGuard is a **Bittensor subnet for adversarial bot detection in competitive systems**, starting with **online poker** as its initial domain.
+dPoker is a **Bittensor subnet for adversarial bot detection in competitive systems**, starting with **online poker** as its initial domain.
 
 The subnet generates **controlled ground-truth datasets** where **humans and bots compete in the same environment**, producing realistic behavioral data that is extremely difficult to replicate through simulation alone.  
 Miners return **calibrated risk scores backed by evidence**, while validators perform **objective, reproducible evaluation** with strong penalties for false positives.
 
-AceGuard is **security infrastructure**, not a game product.
+dPoker is **security infrastructure**, not a game product.
 
 ---
 
@@ -25,7 +25,7 @@ AceGuard is **security infrastructure**, not a game product.
 
 ### Building the Global Trust Infrastructure
 
-AceGuard is evolving into a **behavior validation platform** where detection, prevention, and trust converge across digital ecosystems.
+dPoker is evolving into a **behavior validation platform** where detection, prevention, and trust converge across digital ecosystems.
 
 ### Gaming is where it starts
 
@@ -34,7 +34,7 @@ This makes gaming the ideal laboratory to validate detection systems under real-
 
 ### The universal trust layer
 
-AceGuard is building toward:
+dPoker is building toward:
 - Pre-game and in-game bot identification
 - Cross-platform behavioral analysis
 - Risk scoring with explainable evidence
@@ -53,13 +53,13 @@ The core failure is not model capability, but **evaluation**:
 - No reliable ground truth
 - No continuous adversarial pressure
 
-AceGuard addresses this by creating **living benchmarks** with reliable labels and evolving adversaries.
+dPoker addresses this by creating **living benchmarks** with reliable labels and evolving adversaries.
 
 ---
 
 ## Why Bittensor
 
-AceGuard is an arms race — and Bittensor is purpose-built for arms races:
+dPoker is an arms race — and Bittensor is purpose-built for arms races:
 
 - Open competition between independently trained models
 - Objective, validator-controlled evaluation
@@ -74,7 +74,7 @@ As the subnet scales, both platforms and the network benefit from a virtuous cyc
 
 ### Validators
 Validators:
-- Generate and curate labeled datasets from the AceGuard controlled environment
+- Generate and curate labeled datasets from the dPoker controlled environment
 - Package canonical behavioral signals:
   - Action sequences and decision patterns
   - Timing, pacing, and adaptation traces
@@ -95,7 +95,7 @@ Reference miners may ship with heuristics, but **production-grade ML models are 
 
 ---
 
-## What AceGuard is *not*
+## What dPoker is *not*
 
 To be explicit:
 - ❌ Not a poker platform or gambling product  
@@ -127,7 +127,7 @@ Cross-platform behavioral analysis, automated dataset evolution, developer tooli
 
 ## Contributing
 
-AceGuard is built **in public**.
+dPoker is built **in public**.
 
 You can contribute by:
 - Running a miner or validator
