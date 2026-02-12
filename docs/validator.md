@@ -1,9 +1,9 @@
-# 🔐 Aceguard Validator Guide
+# 🔐 dpoker Validator Guide
 
-Welcome to Aceguard – the poker anti-bot subnet with objective, evolving
+Welcome to dpoker – the poker anti-bot subnet with objective, evolving
 evaluation. This guide covers the lean validator scaffold introduced in v0.
 
-> **Goal for v0:** fetch labeled hands from Aceguard97.com, query miners, score
+> **Goal for v0:** fetch labeled hands from dpoker97.com, query miners, score
 > them with F1-centric rewards, and log results. On-chain publishing and
 > attestations follow in the next milestone.
 
@@ -19,15 +19,15 @@ evaluation. This guide covers the lean validator scaffold introduced in v0.
 ## 🛠️ Install
 
 ```bash
-git clone https://github.com/AceGuardSN/AceGuardSN
-cd AceGuardSN
+git clone https://github.com/dPoker/dPoker
+cd dPoker
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
 ___
-Validators automatically ingest the labeled hands provided by the Aceguard
+Validators automatically ingest the labeled hands provided by the dpoker
 adapter. Human hands are chosen randomly out of massive dataset whereas bot hands are created on the fly to generate near perfect poker hands. No manual player list is required; the dataset already contains ground truth labels for bots and humans.
 
 ---
@@ -35,7 +35,7 @@ adapter. Human hands are chosen randomly out of massive dataset whereas bot hand
 ### Register on Subnet 87
 
 ```bash
-# Register your validator on Aceguard subnet
+# Register your validator on dpoker subnet
 btcli subnet register \
   --wallet.name ag_cold \
   --wallet.hotkey ag_validator \
@@ -54,7 +54,7 @@ btcli wallet overview \
 
 #### Run validator using pm2
 ```bash
-pm2 start python --name aceguard_validator -- \
+pm2 start python --name dpoker_validator -- \
   ./neurons/validator.py \
   --netuid 87 \
   --wallet.name ag_cold \
@@ -75,16 +75,16 @@ Script for running the validator is at `scripts/validator/run/run_vali.sh`
 
 #### Logs:
 ```
-pm2 logs aceguard_validator
+pm2 logs dpoker_validator
 ```
 
 #### Stop / restart / delete:
 ```
-pm2 stop aceguard_validator
+pm2 stop dpoker_validator
 
-pm2 restart aceguard_validator
+pm2 restart dpoker_validator
 
-pm2 delete aceguard_validator
+pm2 delete dpoker_validator
 ```
 
 
@@ -102,7 +102,7 @@ The script currently prints results and sleeps for `poll_interval` seconds befor
 
 ## 🧭 Road to full validator
 
-- ✅ Aceguard ingestion + heuristic scoring loop
+- ✅ dpoker ingestion + heuristic scoring loop
 - ⏳ Persist receipts + publish weights on-chain
 - ⏳ Held-out bot families + early-detection challenges
 - ⏳ Dashboarding and operator-facing APIs
@@ -114,4 +114,4 @@ Track progress in [docs/roadmap.md](roadmap.md).
 ## 🆘 Help
 
 - Open an issue on GitHub for bugs or missing APIs.
-- Reach us on Discord (@sachhp) for any doubts.
+- Reach us on Discord or X (@dpokersubnet) for any doubts.

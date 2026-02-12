@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# AceGuard Miner Startup Script
+# dpoker Miner Startup Script
 
 NETUID=294  ## 87 if mainnet, 294 if testnet
-WALLET_NAME="aceguard-miner-ck"
-HOTKEY="aceguard-miner-hk"
+WALLET_NAME="dpoker-miner-ck"
+HOTKEY="dpoker-miner-hk"
 NETWORK="test"  ## "finney" for mainnet; "test" for testnet
 MINER_SCRIPT="./neurons/miner.py"
-PM2_NAME="aceguard_miner"  ##  name of Miner, as you wish
+PM2_NAME="dpoker_miner"  ##  name of Miner, as you wish
 
 if [ ! -f "$MINER_SCRIPT" ]; then
     echo "Error: Miner script not found at $MINER_SCRIPT"
@@ -21,7 +21,7 @@ fi
 
 pm2 delete $PM2_NAME 2>/dev/null || true
 
-export PYTHONPATH="/root/AceGuardSN"
+export PYTHONPATH="/root/dPoker"
 
 pm2 start $MINER_SCRIPT \
   --name $PM2_NAME -- \

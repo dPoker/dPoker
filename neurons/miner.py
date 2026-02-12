@@ -1,5 +1,5 @@
 """
-Minimal Aceguard miner that returns random bot-risk scores for each hand.
+Minimal dpoker miner that returns random bot-risk scores for each hand.
 """
 
 # from __future__ import annotations
@@ -10,8 +10,8 @@ from typing import Tuple
 
 import bittensor as bt
 
-from Aceguard.base.miner import BaseMinerNeuron
-from Aceguard.validator.synapse import DetectionSynapse
+from dpoker.base.miner import BaseMinerNeuron
+from dpoker.validator.synapse import DetectionSynapse
 
 
 class Miner(BaseMinerNeuron):
@@ -22,7 +22,7 @@ class Miner(BaseMinerNeuron):
 
     def __init__(self, config=None):
         super(Miner, self).__init__(config=config)
-        bt.logging.info("🤖 Random-score Aceguard Miner started")
+        bt.logging.info("🤖 Random-score dpoker Miner started")
         
         # # Attach handlers after initialization
         # self.axon.attach(

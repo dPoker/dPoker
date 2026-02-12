@@ -10,12 +10,18 @@ FINAL validator-oriented behavior:
 - Final chunk order is shuffled to avoid positional patterns.
 
 No external caller (validator/miner) can control these parameters.
+
+SECURITY NOTE:
+Human hands data must be kept PRIVATE and not included in the public repo.
+Validators must configure DPOKER_HUMAN_HANDS_PATH environment variable
+pointing to a local file containing the human hands JSON data.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
@@ -30,7 +36,44 @@ from hands_generator.bot_hands.generate_poker_data import (
 # Constants (fixed, not controllable by validator)
 # ---------------------------------------------------------------------
 
-HUMAN_HANDS_PATH = Path(__file__).parent / "human_hands" / "human_hands.json"
+# Human hands path - MUST be configured via environment variable for security
+# The file should NOT be in the public repo to prevent miners from cheating
+_DEFAULT_HUMAN_HANDS_PATH = Path(__file__).parent / "human_hands" / "human_hands.json"
+
+def _get_human_hands_path() -> Path:
+    """
+    Get the path to human hands data.
+
+    Priority:
+    1. DPOKER_HUMAN_HANDS_PATH environment variable (recommended for production)
+    2. Default path (only for local development)
+
+    Raises:
+        FileNotFoundError: If the configured path doesn't exist
+    """
+    env_path = os.environ.get("DPOKER_HUMAN_HANDS_PATH")
+
+    if env_path:
+        path = Path(env_path)
+        if not path.exists():
+            raise FileNotFoundError(
+                f"Human hands file not found at DPOKER_HUMAN_HANDS_PATH={env_path}. "
+                "Validators must provide a valid path to human hands data."
+            )
+        return path
+
+    # Fallback to default (development only)
+    if _DEFAULT_HUMAN_HANDS_PATH.exists():
+        return _DEFAULT_HUMAN_HANDS_PATH
+
+    raise FileNotFoundError(
+        "Human hands data not found. Validators must set DPOKER_HUMAN_HANDS_PATH "
+        "environment variable pointing to a JSON file with human hand histories. "
+        "This file should NOT be in the public repository."
+    )
+
+
+HUMAN_HANDS_PATH = _get_human_hands_path
 
 CHUNK_COUNT_RANGE: Tuple[int, int] = (40, 60)
 HANDS_PER_CHUNK_RANGE: Tuple[int, int] = (60, 100)
@@ -41,9 +84,38 @@ HUMAN_RATIO_RANGE: Tuple[float, float] = (0.40, 0.60)
 # Helpers
 # ---------------------------------------------------------------------
 
-def load_human_hands(path: Path = HUMAN_HANDS_PATH) -> List[Dict[str, Any]]:
+def load_human_hands(path: Optional[Path] = None) -> List[Dict[str, Any]]:
+    """
+    Load human hands from the configured path.
+
+    Args:
+        path: Optional explicit path. If None, uses DPOKER_HUMAN_HANDS_PATH env var.
+
+    Returns:
+        List of hand dictionaries.
+
+    Raises:
+        FileNotFoundError: If human hands data is not available.
+        ValueError: If the file is not valid JSON (e.g., LFS pointer).
+    """
+    if path is None:
+        path = _get_human_hands_path()
+
     with path.open() as f:
-        return json.load(f)
+        content = f.read()
+
+    # Check for Git LFS pointer
+    if content.startswith("version https://git-lfs"):
+        raise ValueError(
+            f"File at {path} is a Git LFS pointer, not actual data. "
+            "Please ensure you have the real human hands JSON file. "
+            "Validators should set DPOKER_HUMAN_HANDS_PATH to point to the actual data file."
+        )
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in human hands file at {path}: {e}")
 
 
 def _default_bot_profiles() -> List[BotProfile]:

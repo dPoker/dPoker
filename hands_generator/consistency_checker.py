@@ -1,8 +1,8 @@
 """
-Quick consistency checker for Aceguard hand JSON files.
+Quick consistency checker for dpoker hand JSON files.
 
 Validates that hands under hands_generator/bot_hands/bot_hands.json and
-hands_generator/human_hands/human_hands.json match the schema in Aceguard/core/hand_json.py.
+hands_generator/human_hands/human_hands.json match the schema in dpoker/core/hand_json.py.
 """
 
 from __future__ import annotations
@@ -12,12 +12,12 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-# Ensure repo root is on sys.path for Aceguard imports
+# Ensure repo root is on sys.path for dpoker imports
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from Aceguard.core.hand_json import V0_JSON_HAND
+from dpoker.core.hand_json import V0_JSON_HAND
 
 
 # --------- Validation helpers ---------

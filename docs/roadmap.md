@@ -1,7 +1,7 @@
-# AceGuard Roadmap  
+# dPoker Roadmap  
 ## Bot Detection & Trust Infrastructure
 
-AceGuard defines a staged roadmap for building a decentralized bot detection system, starting with online poker and expanding toward a global trust infrastructure.
+dPoker defines a staged roadmap for building a decentralized bot detection system, starting with online poker and expanding toward a global trust infrastructure.
 
 Each phase builds on the previous one, increasing detection sophistication, platform coverage, and operational readiness.
 

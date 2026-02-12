@@ -1,9 +1,9 @@
 """
 Parser that converts the PokerStars text hand history in `data.txt` into the
-Aceguard canonical hand JSON structure defined in `Aceguard/core/hand_json.py`.
+dpoker canonical hand JSON structure defined in `dpoker/core/hand_json.py`.
 
 Usage:
-    python hands_generator/parse_to_aceguard.py
+    python hands_generator/parse_to_dpoker.py
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import copy
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from Aceguard.core.hand_json import V0_JSON_HAND
+from dpoker.core.hand_json import V0_JSON_HAND
 
 
 # Change this salt to any long random string and keep it secret!

@@ -14,7 +14,7 @@ validator_env/*
 miner_env
 miner_env/
 miner_env/*
-Aceguard_env/*
+dpoker_env/*
 runs/
 ~
 ~/*
@@ -193,7 +193,13 @@ hands_generator/human_hands/poker_data/
 hands_generator/human_hands/separate_json/
 hands_generator/human_hands/human_hands_old_small.json
 hands_generator/human_hands/human_hands_old.json
+hands_generator/human_hands/human_hands.json
 hands_generator/bot_hands/bot_hands.json
+
+# Human hands data - MUST be kept private (validators only)
+# Configure via DPOKER_HUMAN_HANDS_PATH environment variable
+*.human_hands.json
+*_dev.json
 
 scripts/validator/update/
 scripts/miner/install_dependencies.sh
