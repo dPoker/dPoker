@@ -23,9 +23,9 @@ import traceback
 
 import bittensor as bt
 
-from Aceguard.base.neuron import BaseNeuron
-from Aceguard.utils.config import add_miner_args
-from Aceguard.validator.synapse import DetectionSynapse
+from dpoker.base.neuron import BaseNeuron
+from dpoker.utils.config import add_miner_args
+from dpoker.validator.synapse import DetectionSynapse
 
 from typing import Union
 

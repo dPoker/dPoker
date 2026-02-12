@@ -1,4 +1,4 @@
-"""Bittensor configuration helpers vendored for the Aceguard subnet."""
+"""Bittensor configuration helpers vendored for the dpoker subnet."""
 
 from __future__ import annotations
 

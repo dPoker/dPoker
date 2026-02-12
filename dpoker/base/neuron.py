@@ -20,14 +20,14 @@ import bittensor as bt
 from abc import ABC, abstractmethod
 
 # Sync calls set weights and also resyncs the metagraph.
-from Aceguard.utils.config import check_config, add_args, config
-from Aceguard.utils.misc import ttl_get_block
+from dpoker.utils.config import check_config, add_args, config
+from dpoker.utils.misc import ttl_get_block
 import time
 import traceback
 import requests
 import re
-from Aceguard import version_url
-from Aceguard import __version__, __spec_version__
+from dpoker import version_url
+from dpoker import __version__, __spec_version__
 
 
 class BaseNeuron(ABC):
@@ -210,21 +210,31 @@ class BaseNeuron(ABC):
         )
 
     def parse_versions(self):
+        """Fetch latest version from GitHub and compare with local version."""
         self.version = __version__
 
-        bt.logging.info("Parsing versions...")
-        response = requests.get(version_url)
-        bt.logging.info(f"Response: {response.status_code}")
-        if response.status_code == 200:
-            content = response.text
+        try:
+            bt.logging.debug("Checking for updates...")
+            response = requests.get(version_url, timeout=5)
 
-            version_pattern = r"__version__\s*=\s*['\"]([^'\"]+)['\"]"
+            if response.status_code == 200:
+                content = response.text
+                version_pattern = r"__version__\s*=\s*['\"]([^'\"]+)['\"]"
+                match = re.search(version_pattern, content)
 
-            try:
-                version = re.search(version_pattern, content).group(1)
-            except AttributeError as e:
-                bt.logging.error(f"While parsing versions got error: {e}")
-                return
-
-            self.version = version
-        return
+                if match:
+                    remote_version = match.group(1)
+                    if remote_version != __version__:
+                        bt.logging.warning(
+                            f"New version available: {remote_version} (current: {__version__})"
+                        )
+                    else:
+                        bt.logging.debug(f"Running latest version: {__version__}")
+                else:
+                    bt.logging.debug("Could not parse remote version, using local")
+            else:
+                bt.logging.debug(f"Version check returned {response.status_code}, using local version")
+        except requests.RequestException as e:
+            bt.logging.debug(f"Version check failed (network issue), using local version: {__version__}")
+        except Exception as e:
+            bt.logging.debug(f"Version check skipped: {e}")

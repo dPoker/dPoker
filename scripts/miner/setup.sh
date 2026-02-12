@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup.sh - Setup Aceguard participant environment
+# setup.sh - Setup dpoker participant environment
 set -e
 
 handle_error() {
@@ -80,7 +80,7 @@ verify_installation() {
 
 show_completion_info() {
   echo
-  success_msg "Aceguard participant environment configured!"
+  success_msg "dpoker participant environment configured!"
   echo
   echo -e "\e[33m[INFO]\e[0m Virtual environment: $(pwd)/miner_env"
   echo -e "\e[33m[INFO]\e[0m To activate: source miner_env/bin/activate"
@@ -90,7 +90,7 @@ show_completion_info() {
   echo -e "\e[34m[NEXT STEPS]\e[0m"
   echo "1. Optionally keep the placeholder miner running:"
   echo "   source miner_env/bin/activate"
-  echo "   pm2 start neurons/miner.py --name aceguard_miner --interpreter python"
+  echo "   pm2 start neurons/miner.py --name dpoker_miner --interpreter python"
 }
 
 main() {

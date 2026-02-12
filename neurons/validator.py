@@ -15,7 +15,7 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-"""Aceguard validator entrypoint wired into the base Bittensor neuron."""
+"""dpoker validator entrypoint wired into the base Bittensor neuron."""
 # neuron/validator.py
 
 from __future__ import annotations
@@ -28,12 +28,12 @@ from typing import Optional, List, Dict, Any
 import bittensor as bt
 from dotenv import load_dotenv
 
-from Aceguard import __version__
-from Aceguard.base.validator import BaseValidatorNeuron
-from Aceguard.utils.config import config
-from Aceguard.core.hand_json import from_standard_json
-from Aceguard.core.models import LabeledHandBatch
-from Aceguard.validator.forward import forward as forward_cycle
+from dpoker import __version__
+from dpoker.base.validator import BaseValidatorNeuron
+from dpoker.utils.config import config
+from dpoker.core.hand_json import from_standard_json
+from dpoker.core.models import LabeledHandBatch
+from dpoker.validator.forward import forward as forward_cycle
 from hands_generator.data_generator import generate_dataset_array
 
 load_dotenv()
@@ -92,18 +92,18 @@ class GeneratedDatasetProvider:
 
 
 class Validator(BaseValidatorNeuron):
-    """Aceguard validator neuron wired into the BaseValidator scaffold."""
+    """dpoker validator neuron wired into the BaseValidator scaffold."""
 
     def __init__(self):
         cfg = config(Validator)
         super().__init__(config=cfg)
-        bt.logging.info(f"🚀 Aceguard Validator v{__version__} started")
+        bt.logging.info(f"🚀 dpoker Validator v{__version__} started")
 
         self.forward_count = 0
         self.settings = cfg
         
-        local_total_hands = int(os.getenv("ACEGUARD_LOCAL_TOTAL_HANDS", "100"))
-        local_human_ratio = float(os.getenv("ACEGUARD_LOCAL_HUMAN_RATIO", "0.5"))
+        local_total_hands = int(os.getenv("DPOKER_LOCAL_TOTAL_HANDS", "100"))
+        local_human_ratio = float(os.getenv("DPOKER_LOCAL_HUMAN_RATIO", "0.5"))
 
         bt.logging.info("📁 Using LOCAL generated data")
         labeled_chunks = generate_dataset_array(

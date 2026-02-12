@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 import sys
 from hands_generator.bot_hands.sandbox_poker_bot import SandboxPokerBot, BotProfile, GameState, LegalActions, Street, ActionType, BotDecision
-from Aceguard.core.hand_json import V0_JSON_HAND
+from dpoker.core.hand_json import V0_JSON_HAND
 
 # Fixed seed for reproducibility
 CURRENT_DATE = str(datetime.now())

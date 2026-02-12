@@ -1,5 +1,5 @@
 """
-Core data models used within the Aceguard subnet.
+Core data models used within the dpoker subnet.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from typing import Dict, List, Mapping, Optional, Sequence
 
 @dataclass(frozen=True)
 class PlayerProfile:
-    """Represents a player in the Aceguard dataset."""
+    """Represents a player in the dpoker dataset."""
 
     player_uid: str
     seat: Optional[int] = None

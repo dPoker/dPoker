@@ -1,5 +1,5 @@
-"""Asynchronous forward loop for the Aceguard validator."""
-## Aceguard/validator/forward.py
+"""Asynchronous forward loop for the dpoker validator."""
+## dpoker/validator/forward.py
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from typing import Dict, List, Sequence
 import bittensor as bt
 import numpy as np
 
-from Aceguard.score.scoring import reward
-from Aceguard.validator.synapse import DetectionSynapse
+from dpoker.score.scoring import reward
+from dpoker.validator.synapse import DetectionSynapse
 
-from Aceguard.validator.constants import BURN_EMISSIONS, BURN_FRACTION, KEEP_FRACTION, UID_ZERO
+from dpoker.validator.constants import BURN_EMISSIONS, BURN_FRACTION, KEEP_FRACTION, UID_ZERO
 
 
 async def forward(validator) -> None:

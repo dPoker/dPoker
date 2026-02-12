@@ -8,8 +8,8 @@ import time
 from typing import List
 
 import bittensor as bt
-from Aceguard.base.validator import BaseValidatorNeuron
-from Aceguard.constants import SAMPLE_K
+from dpoker.base.validator import BaseValidatorNeuron
+from dpoker.constants import SAMPLE_K
 
 
 class Validator(BaseValidatorNeuron):
