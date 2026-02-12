@@ -1,6 +1,6 @@
 <div align="center">
   <h1>🂡 <strong>dPoker</strong> — Adversarial Bot Detection Subnet</h1>
-  <img src="dpoker/assets/Aceguard.png" alt="dPoker logo" style="width:280px;height:280px;">
+  <img src="dpoker/assets/dpoker.png" alt="dPoker logo" style="width:280px;height:280px;">
   <p>
     <a href="docs/validator.md">🔐 Validator Guide</a> &bull;
     <a href="docs/miner.md">🛠️ Miner Guide</a> &bull;
