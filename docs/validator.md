@@ -50,6 +50,16 @@ export ACEGUARD_REQUIRE_MIXED=true   # require hands include both HUMAN and BOT 
 The backend must expose:
 - `GET /internal/eval/next?limit=10&requireMixed=true` (header `x-eval-secret`)
 - `POST /internal/eval/simulate` (dev helper to generate mixed hands)
+- `POST /internal/rooms/ensure` (ensure a discoverable room code exists)
+
+### One-command local stack
+
+From `dPoker/`:
+
+```bash
+chmod +x scripts/validator/p2p/setup.sh
+scripts/validator/p2p/setup.sh
+```
 
 ---
 

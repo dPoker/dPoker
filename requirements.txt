@@ -1,6 +1,9 @@
 pydantic>=2.6
 requests>=2.31
+fastapi>=0.110
+uvicorn>=0.27
 pytest
+pytest-asyncio
 bittensor==10.0.0
 typing-extensions
 python-dotenv>=1.0
