@@ -1,15 +1,15 @@
 # The MIT License (MIT)
-# Copyright © 2025 Aceguard
+# Copyright © 2025 Poker44
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
+# documentation files (the "Software"), to deal in the Software without restriction, including without limitation
 # the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
 # and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all copies or substantial portions of
 # the Software.
 #
-# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
 # THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
 # THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
@@ -40,7 +40,7 @@ with open(path.join(here, "README.md"), encoding="utf-8") as readme:
     long_description = readme.read()
 
 with codecs.open(
-    os.path.join(here, "Aceguard/__init__.py"), encoding="utf-8"
+    os.path.join(here, "poker44/__init__.py"), encoding="utf-8"
 ) as init_file:
     version_match = re.search(
         r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
@@ -48,13 +48,13 @@ with codecs.open(
     version_string = version_match.group(1)
 
 setup(
-    name="aceguard",
+    name="poker44",
     version=version_string,
-    description="Aceguard – Poker bot detection subnet for Bittensor",
+    description="Poker44 – Poker bot detection subnet for Bittensor",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/AceGuardSN/AceGuardSN",
-    author="Aceguard contributors",
+    url="https://github.com/Poker44/Poker44-subnet",
+    author="Poker44 contributors",
     author_email="",
     license="MIT",
     packages=find_packages(),

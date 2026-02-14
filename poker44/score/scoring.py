@@ -1,5 +1,5 @@
 """
-Reward and scoring utilities for Aceguard poker bot detection.
+Reward and scoring utilities for Poker44 poker bot detection.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 <div align="center">
-  <h1>🂡 <strong>dPoker</strong> — Adversarial Bot Detection Subnet</h1>
-  <img src="dPoker/assets/aceguard.png" alt="dPoker logo" style="width:280px;height:280px;">
+  <h1>🂡 <strong>Poker44</strong> — Adversarial Bot Detection Subnet</h1>
+  <img src="poker44/assets/poker44.png" alt="Poker44 logo" style="width:280px;height:280px;">
   <p>
     <a href="docs/validator.md">🔐 Validator Guide</a> &bull;
     <a href="docs/miner.md">🛠️ Miner Guide</a> &bull;
@@ -10,14 +10,14 @@
 
 ---
 
-## What is dPoker?
+## What is Poker44?
 
-dPoker is a **Bittensor subnet for adversarial bot detection in competitive systems**, starting with **online poker** as its initial domain.
+Poker44 is a **Bittensor subnet for adversarial bot detection in competitive systems**, starting with **online poker** as its initial domain.
 
-The subnet generates **controlled ground-truth datasets** where **humans and bots compete in the same environment**, producing realistic behavioral data that is extremely difficult to replicate through simulation alone.  
+The subnet generates **controlled ground-truth datasets** where **humans and bots compete in the same environment**, producing realistic behavioral data that is extremely difficult to replicate through simulation alone.
 Miners return **calibrated risk scores backed by evidence**, while validators perform **objective, reproducible evaluation** with strong penalties for false positives.
 
-dPoker is **security infrastructure**, not a game product.
+Poker44 is **security infrastructure**, not a game product.
 
 ---
 
@@ -25,16 +25,16 @@ dPoker is **security infrastructure**, not a game product.
 
 ### Building the Global Trust Infrastructure
 
-dPoker is evolving into a **behavior validation platform** where detection, prevention, and trust converge across digital ecosystems.
+Poker44 is evolving into a **behavior validation platform** where detection, prevention, and trust converge across digital ecosystems.
 
 ### Gaming is where it starts
 
-Poker and online gaming represent the most adversarial environments: high incentives, observable behavior, and rapidly evolving bots designed to mimic humans.  
+Poker and online gaming represent the most adversarial environments: high incentives, observable behavior, and rapidly evolving bots designed to mimic humans.
 This makes gaming the ideal laboratory to validate detection systems under real-world pressure — before expanding to other domains.
 
 ### The universal trust layer
 
-dPoker is building toward:
+Poker44 is building toward:
 - Pre-game and in-game bot identification
 - Cross-platform behavioral analysis
 - Risk scoring with explainable evidence
@@ -53,13 +53,13 @@ The core failure is not model capability, but **evaluation**:
 - No reliable ground truth
 - No continuous adversarial pressure
 
-dPoker addresses this by creating **living benchmarks** with reliable labels and evolving adversaries.
+Poker44 addresses this by creating **living benchmarks** with reliable labels and evolving adversaries.
 
 ---
 
 ## Why Bittensor
 
-dPoker is an arms race — and Bittensor is purpose-built for arms races:
+Poker44 is an arms race — and Bittensor is purpose-built for arms races:
 
 - Open competition between independently trained models
 - Objective, validator-controlled evaluation
@@ -74,7 +74,7 @@ As the subnet scales, both platforms and the network benefit from a virtuous cyc
 
 ### Validators
 Validators:
-- Generate and curate labeled datasets from the dPoker controlled environment
+- Generate and curate labeled datasets from the Poker44 controlled environment
 - Package canonical behavioral signals:
   - Action sequences and decision patterns
   - Timing, pacing, and adaptation traces
@@ -95,12 +95,12 @@ Reference miners may ship with heuristics, but **production-grade ML models are 
 
 ---
 
-## What dPoker is *not*
+## What Poker44 is *not*
 
 To be explicit:
-- ❌ Not a poker platform or gambling product  
-- ❌ Not competing with poker operators  
-- ❌ Not a static dataset or offline benchmark  
+- ❌ Not a poker platform or gambling product
+- ❌ Not competing with poker operators
+- ❌ Not a static dataset or offline benchmark
 
 Poker is a **means to an end**: generating high-value adversarial data and objective evaluation.
 
@@ -127,7 +127,7 @@ Cross-platform behavioral analysis, automated dataset evolution, developer tooli
 
 ## Contributing
 
-dPoker is built **in public**.
+Poker44 is built **in public**.
 
 You can contribute by:
 - Running a miner or validator

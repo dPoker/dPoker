@@ -1,4 +1,4 @@
-"""Scoring helpers for Aceguard."""
+"""Scoring helpers for Poker44."""
 
 from .scoring import reward
 

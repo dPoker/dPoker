@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup.sh - Setup Aceguard participant environment
+# setup.sh - Setup Poker44 participant environment
 set -e
 
 handle_error() {
@@ -46,10 +46,10 @@ upgrade_pip() {
 install_python_reqs() {
   info_msg "Installing Python dependencies from requirements.txt..."
   [ -f "requirements.txt" ] || handle_error "requirements.txt not found"
-  
+
   pip install -r requirements.txt \
     || handle_error "Failed to install Python dependencies"
-  
+
   success_msg "Packages installed"
 }
 
@@ -70,17 +70,17 @@ install_bittensor() {
 
 verify_installation() {
   info_msg "Verifying participant environment setup..."
-  
+
   # Check Bittensor
   python -c "import bittensor; print(f'✓ Bittensor: {bittensor.__version__}')" || \
     info_msg "⚠ Warning: Bittensor import failed"
-  
+
   success_msg "Installation verification completed."
 }
 
 show_completion_info() {
   echo
-  success_msg "Aceguard participant environment configured!"
+  success_msg "Poker44 participant environment configured!"
   echo
   echo -e "\e[33m[INFO]\e[0m Virtual environment: $(pwd)/miner_env"
   echo -e "\e[33m[INFO]\e[0m To activate: source miner_env/bin/activate"
@@ -90,7 +90,7 @@ show_completion_info() {
   echo -e "\e[34m[NEXT STEPS]\e[0m"
   echo "1. Optionally keep the placeholder miner running:"
   echo "   source miner_env/bin/activate"
-  echo "   pm2 start neurons/miner.py --name aceguard_miner --interpreter python"
+  echo "   pm2 start neurons/miner.py --name poker44_miner --interpreter python"
 }
 
 main() {
@@ -101,7 +101,7 @@ main() {
   install_modules
   install_bittensor
   verify_installation
-  
+
   show_completion_info
 }
 

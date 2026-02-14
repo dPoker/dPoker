@@ -1,4 +1,4 @@
-"""Synapse definitions for Aceguard miners and validators."""
+"""Synapse definitions for Poker44 miners and validators."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import Any, List, Optional
 import bittensor as bt
 from pydantic import ConfigDict, Field
 
-from Aceguard.core.models import HandHistory
+from poker44.core.models import HandHistory
 
 
 class DetectionSynapse(bt.Synapse):

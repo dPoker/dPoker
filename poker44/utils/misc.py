@@ -1,4 +1,4 @@
-"""Utility helpers for Aceguard neurons."""
+"""Utility helpers for Poker44 neurons."""
 
 from __future__ import annotations
 

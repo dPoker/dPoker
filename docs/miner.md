@@ -1,6 +1,6 @@
-# 🛠️ Aceguard Miner Guide
+# 🛠️ Poker44 Miner Guide
 
-Aceguard treats miners as bot-hunters: your job is to classify chunks, where each chunk contain multiple batches and each batches are made up of multiple poker hands and then 
+Poker44 treats miners as bot-hunters: your job is to classify chunks, where each chunk contain multiple batches and each batches are made up of multiple poker hands and then
 return a bot classification result per batch. Validators curate labeled hands from a
 controlled poker environment & real human hands and reward miners who deliver
 accurate, low–false-positive predictions.
@@ -15,8 +15,8 @@ how validators translate your responses into on-chain incentives.
 ## 🛠️ Install
 
 ```bash
-git clone https://github.com/AceGuardSN/AceGuardSN
-cd AceGuardSN
+git clone https://github.com/Poker44/Poker44-subnet
+cd Poker44-subnet
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -31,7 +31,7 @@ live:
 
 ```bash
 btcli wallet new_coldkey --wallet.name my_cold
-btcli wallet new_hotkey  --wallet.name my_cold --wallet.hotkey my_aceguard_hotkey
+btcli wallet new_hotkey  --wallet.name my_cold --wallet.hotkey my_poker44_hotkey
 ```
 
 ---
@@ -39,10 +39,10 @@ btcli wallet new_hotkey  --wallet.name my_cold --wallet.hotkey my_aceguard_hotke
 ### Register on Subnet 87
 
 ```bash
-# Register your miner on Aceguard subnet
+# Register your miner on Poker44 subnet
 btcli subnet register \
   --wallet.name my_cold \
-  --wallet.hotkey my_aceguard_hotkey \
+  --wallet.hotkey my_poker44_hotkey \
   --netuid 87 \
   --subtensor.network finney
 
@@ -70,16 +70,16 @@ Script for running the miner is at `scripts/miner/run/run_miner.sh`
 
 #### Logs:
 ```
-pm2 logs aceguard_miner
+pm2 logs poker44_miner
 ```
 
 #### Stop / restart / delete:
 ```
-pm2 stop aceguard_miner
+pm2 stop poker44_miner
 
-pm2 restart aceguard_miner
+pm2 restart poker44_miner
 
-pm2 delete aceguard_miner
+pm2 delete poker44_miner
 ```
 
 
@@ -99,7 +99,7 @@ Validators send a `DetectionSynapse` containing:
 - **Integrity:** bot provenance tags (for bots), session multi-tabling buckets.
 
 Return a probability in `[0,1]` plus a binary guess; risk scores closer to 1
-indicate “bot”.
+indicate "bot".
 
 ---
 
@@ -116,8 +116,8 @@ indicate “bot”.
 
 ## 🤝 Contribute ideas
 
-- Share new heuristics/features that help catch bots without harming humans.  
-- Add adapters for new bot families or integrity signals.  
+- Share new heuristics/features that help catch bots without harming humans.
+- Add adapters for new bot families or integrity signals.
 - Stress-test the scoring loop with adversarial patterns.
 
 Keep your node online, push better models, and help keep poker tables fair. 🂡

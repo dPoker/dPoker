@@ -20,14 +20,14 @@ import bittensor as bt
 from abc import ABC, abstractmethod
 
 # Sync calls set weights and also resyncs the metagraph.
-from Aceguard.utils.config import check_config, add_args, config
-from Aceguard.utils.misc import ttl_get_block
+from poker44.utils.config import check_config, add_args, config
+from poker44.utils.misc import ttl_get_block
 import time
 import traceback
 import requests
 import re
-from Aceguard import version_url
-from Aceguard import __version__, __spec_version__
+from poker44 import version_url
+from poker44 import __version__, __spec_version__
 
 
 class BaseNeuron(ABC):

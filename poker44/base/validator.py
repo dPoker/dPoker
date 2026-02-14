@@ -1,7 +1,7 @@
 # The MIT License (MIT)
 # Copyright © 2023 Yuma Rao
 # (developer): Miguelik
-# Copyright © 2025 Aceguard Subnet 124
+# Copyright © 2025 Poker44 Subnet
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -26,12 +26,12 @@ import threading
 import bittensor as bt
 from typing import List, Union
 from traceback import print_exception
-from Aceguard.base.neuron import BaseNeuron
-from Aceguard.base.utils.weight_utils import (
+from poker44.base.neuron import BaseNeuron
+from poker44.base.utils.weight_utils import (
     process_weights_for_netuid,
     convert_weights_and_uids_for_emit,
 )
-from Aceguard.utils.config import add_validator_args
+from poker44.utils.config import add_validator_args
 
 
 class BaseValidatorNeuron(BaseNeuron):

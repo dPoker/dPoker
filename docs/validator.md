@@ -1,9 +1,9 @@
-# 🔐 Aceguard Validator Guide
+# 🔐 Poker44 Validator Guide
 
-Welcome to Aceguard – the poker anti-bot subnet with objective, evolving
+Welcome to Poker44 – the poker anti-bot subnet with objective, evolving
 evaluation. This guide covers the lean validator scaffold introduced in v0.
 
-> **Goal for v0:** fetch labeled hands from Aceguard97.com, query miners, score
+> **Goal for v0:** fetch labeled hands from Poker44, query miners, score
 > them with F1-centric rewards, and log results. On-chain publishing and
 > attestations follow in the next milestone.
 
@@ -11,23 +11,23 @@ evaluation. This guide covers the lean validator scaffold introduced in v0.
 
 ## ✅ Requirements
 
-- Ubuntu 22.04+ (or any Linux with Python 3.10/3.11 available)
-- Python 3.10+
+- Ubuntu 22.04+ (or any Linux with Python 3.10/3.11 available)
+- Python 3.10+
 
 ---
 
 ## 🛠️ Install
 
 ```bash
-git clone https://github.com/AceGuardSN/AceGuardSN
-cd AceGuardSN
+git clone https://github.com/Poker44/Poker44-subnet
+cd Poker44-subnet
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
 ___
-Validators automatically ingest the labeled hands provided by the Aceguard
+Validators automatically ingest the labeled hands provided by the Poker44
 adapter. Human hands are chosen randomly out of massive dataset whereas bot hands are created on the fly to generate near perfect poker hands. No manual player list is required; the dataset already contains ground truth labels for bots and humans.
 
 ---
@@ -35,16 +35,16 @@ adapter. Human hands are chosen randomly out of massive dataset whereas bot hand
 ### Register on Subnet 87
 
 ```bash
-# Register your validator on Aceguard subnet
+# Register your validator on Poker44 subnet
 btcli subnet register \
-  --wallet.name ag_cold \
-  --wallet.hotkey ag_validator \
+  --wallet.name p44_cold \
+  --wallet.hotkey p44_validator \
   --netuid 87 \
   --subtensor.network finney
 
 # Check registration status
 btcli wallet overview \
-   --wallet.name ag_cold \
+   --wallet.name p44_cold \
    --subtensor.network finney
 ```
 ---
@@ -54,11 +54,11 @@ btcli wallet overview \
 
 #### Run validator using pm2
 ```bash
-pm2 start python --name aceguard_validator -- \
+pm2 start python --name poker44_validator -- \
   ./neurons/validator.py \
   --netuid 87 \
-  --wallet.name ag_cold \
-  --wallet.hotkey ag_validator \
+  --wallet.name p44_cold \
+  --wallet.hotkey p44_validator \
   --subtensor.network finney \
   --logging.debug
 ```
@@ -75,23 +75,23 @@ Script for running the validator is at `scripts/validator/run/run_vali.sh`
 
 #### Logs:
 ```
-pm2 logs aceguard_validator
+pm2 logs poker44_validator
 ```
 
 #### Stop / restart / delete:
 ```
-pm2 stop aceguard_validator
+pm2 stop poker44_validator
 
-pm2 restart aceguard_validator
+pm2 restart poker44_validator
 
-pm2 delete aceguard_validator
+pm2 delete poker44_validator
 ```
 
 
 What happens each cycle:
 
 1. Labeled hands (actions, timing, integrity signals) are fetched.
-2. A batch is generated consisting of a single hand type & multiple batches are used to create a chunk. 
+2. A batch is generated consisting of a single hand type & multiple batches are used to create a chunk.
 3. Chunks are dispatched to miners; responses are scored with F1-heavy rewards.
 4. Rewards are logged and used to update weights; emissions are allocated with
    a burn bias when no eligible miners respond.
@@ -102,7 +102,7 @@ The script currently prints results and sleeps for `poll_interval` seconds befor
 
 ## 🧭 Road to full validator
 
-- ✅ Aceguard ingestion + heuristic scoring loop
+- ✅ Poker44 ingestion + heuristic scoring loop
 - ⏳ Persist receipts + publish weights on-chain
 - ⏳ Held-out bot families + early-detection challenges
 - ⏳ Dashboarding and operator-facing APIs

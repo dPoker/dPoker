@@ -1,5 +1,5 @@
 """
-Standard JSON structure for Aceguard poker hands.
+Standard JSON structure for Poker44 poker hands.
 
 Validators receive batches of hands already structured in this format; miners
 consume arrays of these hand JSON objects (one array per player) to decide if
@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from Aceguard.core.models import HandHistory
+from poker44.core.models import HandHistory
 
-# Example hand encoded in the Aceguard canonical JSON structure.
+# Example hand encoded in the Poker44 canonical JSON structure.
 V0_JSON_HAND: dict[str, Any] = {
     "metadata": {
         "game_type": "Hold'em",
@@ -63,6 +63,6 @@ V0_JSON_HAND: dict[str, Any] = {
 
 def from_standard_json(payload: Mapping[str, Any]) -> HandHistory:
     """
-    Convert a structured Aceguard hand JSON payload into a HandHistory object.
+    Convert a structured Poker44 hand JSON payload into a HandHistory object.
     """
     return HandHistory.from_payload(payload)
