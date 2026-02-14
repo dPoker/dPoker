@@ -41,17 +41,15 @@ ensure_json="$(curl -sf -X POST \
   "$platform_url/internal/rooms/ensure")" || die "Failed to call /internal/rooms/ensure"
 [ -n "$ensure_json" ] || die "/internal/rooms/ensure returned empty body"
 
-room_code="$(python3 - <<'PY'
-import json,sys
+room_code="$(python3 -c 'import json,sys
+raw=sys.stdin.read()
 try:
-  data=json.load(sys.stdin)
+  data=json.loads(raw) if raw else {}
 except Exception as e:
-  print(f"invalid json: {e}", file=sys.stderr)
+  print(f\"invalid json: {e}\", file=sys.stderr)
   raise SystemExit(2)
-room=((data.get("data") or {}) if isinstance(data, dict) else {}).get("roomCode")
-print(room or "")
-PY
-<<<"$ensure_json")" || die "Failed to parse /internal/rooms/ensure response as JSON"
+room=((data.get(\"data\") or {}) if isinstance(data, dict) else {}).get(\"roomCode\")
+print(room or \"\")' <<<"$ensure_json")" || die "Failed to parse /internal/rooms/ensure response as JSON"
 
 log "Room code: ${room_code:-<none>}"
 
@@ -67,17 +65,15 @@ next_json="$(curl -sf -H "x-eval-secret: $secret" \
   "$platform_url/internal/eval/next?limit=3&requireMixed=true")" || die "Failed to call /internal/eval/next"
 [ -n "$next_json" ] || die "/internal/eval/next returned empty body"
 
-batch_count="$(python3 - <<'PY'
-import json,sys
+batch_count="$(python3 -c 'import json,sys
+raw=sys.stdin.read()
 try:
-  data=json.load(sys.stdin)
+  data=json.loads(raw) if raw else {}
 except Exception as e:
-  print(f"invalid json: {e}", file=sys.stderr)
+  print(f\"invalid json: {e}\", file=sys.stderr)
   raise SystemExit(2)
-batches=(((data.get("data") or {}) if isinstance(data, dict) else {}).get("batches") or [])
-print(len(batches) if isinstance(batches, list) else 0)
-PY
-<<<"$next_json")" || die "Failed to parse /internal/eval/next response as JSON"
+batches=(((data.get(\"data\") or {}) if isinstance(data, dict) else {}).get(\"batches\") or [])
+print(len(batches) if isinstance(batches, list) else 0)' <<<"$next_json")" || die "Failed to parse /internal/eval/next response as JSON"
 
 log "Batches returned: $batch_count"
 [ "$batch_count" -ge 1 ] || die "Expected at least 1 batch from /internal/eval/next"
@@ -92,19 +88,20 @@ if [ -n "$directory_url" ]; then
     deadline="$(( $(date +%s) + 45 ))"
     while true; do
       rooms_json="$(curl -sf "$directory_url/rooms")"
-      listed="$(python3 - <<'PY'
-import json,sys
+      listed="$(python3 -c 'import json,sys
 validator_id=sys.argv[1]
-rooms=json.load(sys.stdin)
+raw=sys.stdin.read()
+try:
+  rooms=json.loads(raw) if raw else []
+except Exception:
+  rooms=[]
 ok=False
 if isinstance(rooms, list):
   for r in rooms:
-    if isinstance(r, dict) and r.get("validator_id")==validator_id:
+    if isinstance(r, dict) and r.get(\"validator_id\")==validator_id:
       ok=True
       break
-print("true" if ok else "false")
-PY
-"$validator_id" <<<"$rooms_json")"
+print(\"true\" if ok else \"false\")' "$validator_id" <<<"$rooms_json")"
 
       if [ "$listed" = "true" ]; then
         log "Directory lists validator_id=$validator_id"
