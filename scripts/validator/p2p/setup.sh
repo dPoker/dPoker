@@ -216,42 +216,46 @@ def wait(url, timeout=60):
     time.sleep(0.2)
   raise SystemExit(f"timeout waiting for {url}")
 wait("$frontend_url", 90)
+wait("$frontend_url/poker-gameplay/p2p", 90)
 print("ok")
 PY
 
   cd "$poker44_dir"
 fi
 
-log "Running validator self-check + mock evaluation cycle (and announcing room)"
-# New env vars (preferred)
-export POKER44_PROVIDER="platform"
-export POKER44_PLATFORM_BACKEND_URL="$platform_url"
-export POKER44_INTERNAL_EVAL_SECRET="$eval_secret"
-export POKER44_DIRECTORY_URL="http://127.0.0.1:$directory_port"
-export POKER44_DIRECTORY_SHARED_SECRET="$directory_secret"
-export POKER44_VALIDATOR_ID="$validator_id"
-export POKER44_ANNOUNCE_INTERVAL_S="${POKER44_ANNOUNCE_INTERVAL_S:-2}"
-export POKER44_MOCK_MINERS="${POKER44_MOCK_MINERS:-2}"
-export POKER44_REWARD_WINDOW="${POKER44_REWARD_WINDOW:-1}"
+run_mock="${RUN_MOCK_VALIDATOR:-true}"
+if [ "${run_mock,,}" != "false" ]; then
+  log "Running validator self-check + mock evaluation cycle (and announcing room)"
+  # New env vars (preferred)
+  export POKER44_PROVIDER="platform"
+  export POKER44_PLATFORM_BACKEND_URL="$platform_url"
+  export POKER44_INTERNAL_EVAL_SECRET="$eval_secret"
+  export POKER44_DIRECTORY_URL="http://127.0.0.1:$directory_port"
+  export POKER44_DIRECTORY_SHARED_SECRET="$directory_secret"
+  export POKER44_VALIDATOR_ID="$validator_id"
+  export POKER44_ANNOUNCE_INTERVAL_S="${POKER44_ANNOUNCE_INTERVAL_S:-2}"
+  export POKER44_MOCK_MINERS="${POKER44_MOCK_MINERS:-2}"
+  export POKER44_REWARD_WINDOW="${POKER44_REWARD_WINDOW:-1}"
 
-python scripts/validator/p2p/run_mock_validator.py
+  python scripts/validator/p2p/run_mock_validator.py
 
-log "Directory rooms listing:"
-python - <<PY
+  log "Directory rooms listing:"
+  python - <<PY
 import requests, json
 rooms=requests.get("http://127.0.0.1:$directory_port/rooms", timeout=5).json()
 print(json.dumps(rooms, indent=2))
 PY
 
-start_daemon="${START_DAEMON:-true}"
-if [ "${start_daemon,,}" != "false" ]; then
-  log "Starting mock validator daemon (periodic announce + eval cycles)"
-  export POKER44_RUN_FOREVER="true"
-  export POKER44_POLL_INTERVAL_S="${POKER44_POLL_INTERVAL_S:-10}"
-  nohup python scripts/validator/p2p/run_mock_validator.py >"$poker44_dir/.mock_validator.log" 2>&1 &
-  mock_validator_pid=$!
-  echo "$mock_validator_pid" >"$poker44_dir/.mock_validator.pid"
-  log "Mock validator pid: $mock_validator_pid (log: $poker44_dir/.mock_validator.log)"
+  start_daemon="${START_DAEMON:-true}"
+  if [ "${start_daemon,,}" != "false" ]; then
+    log "Starting mock validator daemon (periodic announce + eval cycles)"
+    export POKER44_RUN_FOREVER="true"
+    export POKER44_POLL_INTERVAL_S="${POKER44_POLL_INTERVAL_S:-10}"
+    nohup python scripts/validator/p2p/run_mock_validator.py >"$poker44_dir/.mock_validator.log" 2>&1 &
+    mock_validator_pid=$!
+    echo "$mock_validator_pid" >"$poker44_dir/.mock_validator.pid"
+    log "Mock validator pid: $mock_validator_pid (log: $poker44_dir/.mock_validator.log)"
+  fi
 fi
 
 log "Setup complete."
