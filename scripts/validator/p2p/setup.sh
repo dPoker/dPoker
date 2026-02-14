@@ -44,6 +44,7 @@ nohup python -m uvicorn Aceguard.p2p.room_directory.app:app \
   --host 127.0.0.1 --port "$directory_port" \
   >"$dpoker_dir/.room_directory.log" 2>&1 &
 directory_pid=$!
+echo "$directory_pid" >"$dpoker_dir/.room_directory.pid"
 log "Room directory pid: $directory_pid (log: $dpoker_dir/.room_directory.log)"
 
 log "Preparing platform backend (.env, docker, migrations)"
@@ -72,6 +73,7 @@ npm run migration:run:dev
 log "Starting platform backend dev server"
 nohup npm run dev >"$platform_dir/.platform_backend.log" 2>&1 &
 platform_pid=$!
+echo "$platform_pid" >"$platform_dir/.platform_backend.pid"
 log "Platform backend pid: $platform_pid (log: $platform_dir/.platform_backend.log)"
 
 log "Waiting for platform + directory health"
