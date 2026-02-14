@@ -42,14 +42,14 @@ ensure_json="$(curl -sf -X POST \
 [ -n "$ensure_json" ] || die "/internal/rooms/ensure returned empty body"
 
 room_code="$(python3 -c 'import json,sys
-raw=sys.stdin.read()
+raw = sys.stdin.read()
 try:
-  data=json.loads(raw) if raw else {}
+  data = json.loads(raw) if raw else {}
 except Exception as e:
-  print(f\"invalid json: {e}\", file=sys.stderr)
+  print(f"invalid json: {e}", file=sys.stderr)
   raise SystemExit(2)
-room=((data.get(\"data\") or {}) if isinstance(data, dict) else {}).get(\"roomCode\")
-print(room or \"\")' <<<"$ensure_json")" || die "Failed to parse /internal/rooms/ensure response as JSON"
+room = ((data.get("data") or {}) if isinstance(data, dict) else {}).get("roomCode")
+print(room or "")' <<<"$ensure_json")" || die "Failed to parse /internal/rooms/ensure response as JSON"
 
 log "Room code: ${room_code:-<none>}"
 
@@ -66,13 +66,13 @@ next_json="$(curl -sf -H "x-eval-secret: $secret" \
 [ -n "$next_json" ] || die "/internal/eval/next returned empty body"
 
 batch_count="$(python3 -c 'import json,sys
-raw=sys.stdin.read()
+raw = sys.stdin.read()
 try:
-  data=json.loads(raw) if raw else {}
+  data = json.loads(raw) if raw else {}
 except Exception as e:
-  print(f\"invalid json: {e}\", file=sys.stderr)
+  print(f"invalid json: {e}", file=sys.stderr)
   raise SystemExit(2)
-batches=(((data.get(\"data\") or {}) if isinstance(data, dict) else {}).get(\"batches\") or [])
+batches = (((data.get("data") or {}) if isinstance(data, dict) else {}).get("batches") or [])
 print(len(batches) if isinstance(batches, list) else 0)' <<<"$next_json")" || die "Failed to parse /internal/eval/next response as JSON"
 
 log "Batches returned: $batch_count"
@@ -89,19 +89,19 @@ if [ -n "$directory_url" ]; then
     while true; do
       rooms_json="$(curl -sf "$directory_url/rooms")"
       listed="$(python3 -c 'import json,sys
-validator_id=sys.argv[1]
-raw=sys.stdin.read()
+validator_id = sys.argv[1]
+raw = sys.stdin.read()
 try:
-  rooms=json.loads(raw) if raw else []
+  rooms = json.loads(raw) if raw else []
 except Exception:
-  rooms=[]
-ok=False
+  rooms = []
+ok = False
 if isinstance(rooms, list):
   for r in rooms:
-    if isinstance(r, dict) and r.get(\"validator_id\")==validator_id:
-      ok=True
+    if isinstance(r, dict) and r.get("validator_id") == validator_id:
+      ok = True
       break
-print(\"true\" if ok else \"false\")' "$validator_id" <<<"$rooms_json")"
+print("true" if ok else "false")' "$validator_id" <<<"$rooms_json")"
 
       if [ "$listed" = "true" ]; then
         log "Directory lists validator_id=$validator_id"
