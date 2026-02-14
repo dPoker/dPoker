@@ -32,6 +32,27 @@ adapter. Human hands are chosen randomly out of massive dataset whereas bot hand
 
 ---
 
+## Local Platform Backend (P2P Mode)
+
+For the decentralized setup, each validator runs its **own** poker platform backend (Postgres + Redis + gameplay)
+and pulls **fresh, consume-once** labeled batches from it.
+
+Set:
+
+```bash
+export ACEGUARD_PROVIDER=platform
+export ACEGUARD_PLATFORM_BACKEND_URL=http://localhost:3001
+export ACEGUARD_INTERNAL_EVAL_SECRET=dev-internal-eval-secret
+# Optional:
+export ACEGUARD_REQUIRE_MIXED=true   # require hands include both HUMAN and BOT seats
+```
+
+The backend must expose:
+- `GET /internal/eval/next?limit=10&requireMixed=true` (header `x-eval-secret`)
+- `POST /internal/eval/simulate` (dev helper to generate mixed hands)
+
+---
+
 ### Register on Subnet 87
 
 ```bash

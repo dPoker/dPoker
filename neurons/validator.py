@@ -27,6 +27,7 @@ from typing import Optional, List, Dict, Any
 
 import bittensor as bt
 from dotenv import load_dotenv
+import requests
 
 from Aceguard import __version__
 from Aceguard.base.validator import BaseValidatorNeuron
@@ -91,6 +92,74 @@ class GeneratedDatasetProvider:
         return batches
 
 
+class PlatformBackendProvider:
+    """
+    Provider that pulls *fresh* labeled batches from the local validator poker backend.
+
+    The backend must expose:
+      GET /internal/eval/next?limit=10&requireMixed=true
+    with header:
+      x-eval-secret: <shared secret>
+
+    Response format:
+      { "success": true, "data": { "batches": [ { "is_human": bool, "hands": [dict, ...] }, ... ] } }
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        secret: str,
+        *,
+        require_mixed: bool = True,
+        timeout_s: float = 5.0,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.secret = secret
+        self.require_mixed = require_mixed
+        self.timeout_s = timeout_s
+
+    def fetch_hand_batch(
+        self,
+        *,
+        limit: int = 10,
+        include_integrity: bool = True,  # kept for provider compatibility
+    ) -> List[LabeledHandBatch]:
+        if not self.secret:
+            bt.logging.warning("ACEGUARD_INTERNAL_EVAL_SECRET not set; cannot use platform provider.")
+            return []
+
+        try:
+            r = requests.get(
+                f"{self.base_url}/internal/eval/next",
+                params={
+                    "limit": int(limit),
+                    "requireMixed": "true" if self.require_mixed else "false",
+                },
+                headers={"x-eval-secret": self.secret},
+                timeout=self.timeout_s,
+            )
+            r.raise_for_status()
+            data = r.json()
+            if not isinstance(data, dict) or not data.get("success"):
+                return []
+            payload = data.get("data", {}) or {}
+            raw_batches = payload.get("batches", [])
+        except Exception as e:
+            bt.logging.warning(f"Platform provider fetch failed: {e}")
+            return []
+
+        out: List[LabeledHandBatch] = []
+        for b in raw_batches:
+            try:
+                is_human = bool(b.get("is_human", False))
+                hands = b.get("hands", [])
+                # Hands are already dict payloads (sanitized by the backend).
+                out.append(LabeledHandBatch(hands=hands, is_human=is_human))
+            except Exception:
+                continue
+        return out
+
+
 class Validator(BaseValidatorNeuron):
     """Aceguard validator neuron wired into the BaseValidator scaffold."""
 
@@ -102,14 +171,20 @@ class Validator(BaseValidatorNeuron):
         self.forward_count = 0
         self.settings = cfg
         
-        local_total_hands = int(os.getenv("ACEGUARD_LOCAL_TOTAL_HANDS", "100"))
-        local_human_ratio = float(os.getenv("ACEGUARD_LOCAL_HUMAN_RATIO", "0.5"))
+        provider_mode = os.getenv("ACEGUARD_PROVIDER", "local_generated").strip().lower()
+        if provider_mode == "platform":
+            bt.logging.info("🔌 Using PLATFORM backend provider (fresh hands)")
+            self.provider = PlatformBackendProvider(
+                base_url=os.getenv("ACEGUARD_PLATFORM_BACKEND_URL", "http://localhost:3001"),
+                secret=os.getenv("ACEGUARD_INTERNAL_EVAL_SECRET", ""),
+                require_mixed=os.getenv("ACEGUARD_REQUIRE_MIXED", "true").lower() != "false",
+                timeout_s=float(os.getenv("ACEGUARD_PLATFORM_TIMEOUT_S", "5.0")),
+            )
+        else:
+            bt.logging.info("📁 Using LOCAL generated data")
+            labeled_chunks = generate_dataset_array(include_labels=True)
+            self.provider = GeneratedDatasetProvider(labeled_chunks, shuffle=True, loop=True)
 
-        bt.logging.info("📁 Using LOCAL generated data")
-        labeled_chunks = generate_dataset_array(
-            include_labels=True,
-        )
-        self.provider = GeneratedDatasetProvider(labeled_chunks, shuffle=True, loop=True)
         self.poll_interval = self.settings.poll_interval_seconds
         self.prediction_buffer = {}
         self.label_buffer = {}
