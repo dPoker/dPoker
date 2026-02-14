@@ -84,6 +84,9 @@ cover/
 # Django stuff:
 *.log
 *.pid
+
+# Local P2P deploy artifacts
+.p2p_deploy.env
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
