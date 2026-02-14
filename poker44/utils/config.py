@@ -62,14 +62,14 @@ def add_args(cls, parser: argparse.ArgumentParser) -> None:
         help="Disable serving the axon endpoint.",
     )
     parser.add_argument(
-    "--blacklist.force_validator_permit",
-    action="store_true",
-    default=True,
-    help="Only allow requests from validators with permits.",
+        "--blacklist.force_validator_permit",
+        action="store_true",
+        default=False,
+        help="Only allow requests from validators with permits.",
     )
     parser.add_argument(
         "--blacklist.allow_non_registered",
-        action="store_false",
+        action="store_true",
         default=False,
         help="Allow requests from non-registered entities.",
     )
