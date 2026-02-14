@@ -40,6 +40,7 @@ class MockValidator:
         self.provider = provider
         self.forward_count = 0
         self.poll_interval = 0
+        self.task_batch_size = 2
         self.reward_window = 1
         self.config = SimpleNamespace(neuron=SimpleNamespace(timeout=1.0))
         self.metagraph = SimpleNamespace(axons=[MockAxon("m0"), MockAxon("m1")])
@@ -72,4 +73,3 @@ def test_forward_cycle_builds_chunks_and_scores():
     # Rewards computed (window=1)
     assert v.latest_rewards is not None
     assert len(v.latest_rewards) == 2
-

@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import traceback
 import time
+import os
 from typing import Dict, List, Sequence
 
 import bittensor as bt
@@ -29,12 +30,34 @@ async def _run_forward_cycle(validator) -> None:
     validator.forward_count = getattr(validator, "forward_count", 0) + 1
     bt.logging.info(f"[Forward #{validator.forward_count}] start")
     
-    # Fetch multiple batches (e.g., 10 batches at once)
-    batches = validator.provider.fetch_hand_batch(limit=10)
-    if not batches:
-        bt.logging.info("No hands fetched from dataset; sleeping.")
+    # Accumulate fresh batches until we reach the requested chunk count (N),
+    # then evaluate miners on exactly those N chunks and wait for the next N.
+    raw_n = getattr(validator, "task_batch_size", None)
+    try:
+        n = int(raw_n) if raw_n is not None else int(os.getenv("POKER44_TASK_BATCH_SIZE", "10"))
+    except Exception:
+        n = 10
+    n = max(1, min(200, n))
+
+    pending: List = getattr(validator, "_pending_batches", [])
+    if not isinstance(pending, list):
+        pending = []
+
+    # Fill the buffer up to N (avoid over-consuming hands from the provider).
+    need = max(0, n - len(pending))
+    if need > 0:
+        new_batches = validator.provider.fetch_hand_batch(limit=need)
+        if new_batches:
+            pending.extend(new_batches)
+        validator._pending_batches = pending
+
+    if len(pending) < n:
+        bt.logging.info(f"Buffered {len(pending)}/{n} eval batches; sleeping.")
         await asyncio.sleep(validator.poll_interval)
         return
+
+    batches = pending[:n]
+    validator._pending_batches = pending[n:]
     
     axons = validator.metagraph.axons
     miner_uids = list(range(len(axons)))
