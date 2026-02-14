@@ -2,8 +2,8 @@ import time
 
 from fastapi.testclient import TestClient
 
-from Aceguard.p2p.crypto import hmac_sign
-from Aceguard.p2p.room_directory.app import app
+from poker44.p2p.crypto import hmac_sign
+from poker44.p2p.room_directory.app import app
 
 
 def test_directory_announce_and_list():

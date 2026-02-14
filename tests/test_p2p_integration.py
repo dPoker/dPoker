@@ -10,7 +10,7 @@ import pytest
 import uvicorn
 from fastapi import FastAPI
 
-from Aceguard.p2p.room_directory.app import app as directory_app
+from poker44.p2p.room_directory.app import app as directory_app
 
 
 def _free_port() -> int:
@@ -67,9 +67,18 @@ def test_p2p_runner_announces_room_and_runs_mock_cycle(monkeypatch):
     def eval_health():
         return {"ok": True}
 
+    @platform.get("/internal/rooms/health")
+    def rooms_health():
+        return {"ok": True}
+
     @platform.post("/internal/rooms/ensure")
     def ensure_room():
         return {"success": True, "data": {"roomCode": "ROOM123"}}
+
+    @platform.post("/internal/rooms/{code}/start")
+    def start_room(code: str):
+        # Best-effort endpoint used by the p2p runner to auto-start once enough players join.
+        return {"success": True, "data": {"roomCode": code, "status": "WAITING", "started": False}}
 
     @platform.get("/internal/eval/next")
     def next_batches():
@@ -86,14 +95,14 @@ def test_p2p_runner_announces_room_and_runs_mock_cycle(monkeypatch):
     # Run the mock validator runner once.
     from scripts.validator.p2p.run_mock_validator import main as runner_main
 
-    monkeypatch.setenv("ACEGUARD_PROVIDER", "platform")
-    monkeypatch.setenv("ACEGUARD_PLATFORM_BACKEND_URL", f"http://127.0.0.1:{plat_port}")
-    monkeypatch.setenv("ACEGUARD_INTERNAL_EVAL_SECRET", "dev-internal-eval-secret")
-    monkeypatch.setenv("ACEGUARD_DIRECTORY_URL", f"http://127.0.0.1:{dir_port}")
-    monkeypatch.setenv("ACEGUARD_DIRECTORY_SHARED_SECRET", "dev-secret")
-    monkeypatch.setenv("ACEGUARD_VALIDATOR_ID", "vali-it-1")
-    monkeypatch.setenv("ACEGUARD_ANNOUNCE_INTERVAL_S", "1")
-    monkeypatch.setenv("ACEGUARD_MOCK_MINERS", "2")
+    monkeypatch.setenv("POKER44_PROVIDER", "platform")
+    monkeypatch.setenv("POKER44_PLATFORM_BACKEND_URL", f"http://127.0.0.1:{plat_port}")
+    monkeypatch.setenv("POKER44_INTERNAL_EVAL_SECRET", "dev-internal-eval-secret")
+    monkeypatch.setenv("POKER44_DIRECTORY_URL", f"http://127.0.0.1:{dir_port}")
+    monkeypatch.setenv("POKER44_DIRECTORY_SHARED_SECRET", "dev-secret")
+    monkeypatch.setenv("POKER44_VALIDATOR_ID", "vali-it-1")
+    monkeypatch.setenv("POKER44_ANNOUNCE_INTERVAL_S", "1")
+    monkeypatch.setenv("POKER44_MOCK_MINERS", "2")
 
     code = asyncio.run(runner_main())
     assert code == 0

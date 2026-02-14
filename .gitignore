@@ -14,7 +14,7 @@ validator_env/*
 miner_env
 miner_env/
 miner_env/*
-Aceguard_env/*
+poker44_env/*
 runs/
 ~
 ~/*
@@ -83,6 +83,7 @@ cover/
 
 # Django stuff:
 *.log
+*.pid
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -186,14 +187,14 @@ cython_debug/
 .idea/
 mixed_hands.json
 
-hands_generator/human_hands/raw_files_hands/
+poker44/hands_generator/human_hands/raw_files_hands/
 
-hands_generator/human_hands/hands_txt/
-hands_generator/human_hands/poker_data/
-hands_generator/human_hands/separate_json/
-hands_generator/human_hands/human_hands_old_small.json
-hands_generator/human_hands/human_hands_old.json
-hands_generator/bot_hands/bot_hands.json
+poker44/hands_generator/human_hands/hands_txt/
+poker44/hands_generator/human_hands/poker_data/
+poker44/hands_generator/human_hands/separate_json/
+poker44/hands_generator/human_hands/human_hands_old_small.json
+poker44/hands_generator/human_hands/human_hands_old.json
+poker44/hands_generator/bot_hands/bot_hands.json
 
 scripts/validator/update/
 scripts/miner/install_dependencies.sh

@@ -1,5 +1,5 @@
 # The MIT License (MIT)
-# Copyright © 2025 Aceguard
+# Copyright © 2025 poker44
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -40,7 +40,7 @@ with open(path.join(here, "README.md"), encoding="utf-8") as readme:
     long_description = readme.read()
 
 with codecs.open(
-    os.path.join(here, "Aceguard/__init__.py"), encoding="utf-8"
+    os.path.join(here, "poker44/__init__.py"), encoding="utf-8"
 ) as init_file:
     version_match = re.search(
         r"^__version__ = ['\"]([^'\"]*)['\"]", init_file.read(), re.M
@@ -48,13 +48,13 @@ with codecs.open(
     version_string = version_match.group(1)
 
 setup(
-    name="aceguard",
+    name="poker44",
     version=version_string,
-    description="Aceguard – Poker bot detection subnet for Bittensor",
+    description="poker44 – Poker bot detection subnet for Bittensor",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/AceGuardSN/AceGuardSN",
-    author="Aceguard contributors",
+    url="",
+    author="poker44 contributors",
     author_email="",
     license="MIT",
     packages=find_packages(),

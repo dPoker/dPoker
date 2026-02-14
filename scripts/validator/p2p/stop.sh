@@ -2,8 +2,12 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-dpoker_dir="$(cd "$here/../../.." && pwd)"
-platform_dir="${PLATFORM_BACKEND_DIR:-$dpoker_dir/../poker44-platform-backend}"
+poker44_dir="$(cd "$here/../../.." && pwd)"
+# Default workspace layout:
+#   <workspace>/poker44-subnet
+#   <workspace>/platform/backend
+platform_dir="${PLATFORM_BACKEND_DIR:-$poker44_dir/../platform/backend}"
+platform_frontend_dir="${PLATFORM_FRONTEND_DIR:-$poker44_dir/../platform/frontend}"
 
 kill_if_running() {
   local pid_file="$1"
@@ -23,9 +27,9 @@ kill_if_running() {
   rm -f "$pid_file"
 }
 
-kill_if_running "$dpoker_dir/.mock_validator.pid"
-kill_if_running "$dpoker_dir/.room_directory.pid"
+kill_if_running "$poker44_dir/.mock_validator.pid"
+kill_if_running "$poker44_dir/.room_directory.pid"
 kill_if_running "$platform_dir/.platform_backend.pid"
+kill_if_running "$platform_frontend_dir/.platform_frontend.pid"
 
 echo "[info] stopped (best-effort)"
-

@@ -1,11 +1,10 @@
-# 🔐 Aceguard Validator Guide
+# 🔐 poker44 Validator Guide
 
-Welcome to Aceguard – the poker anti-bot subnet with objective, evolving
+Welcome to poker44 – the poker anti-bot subnet with objective, evolving
 evaluation. This guide covers the lean validator scaffold introduced in v0.
 
-> **Goal for v0:** fetch labeled hands from Aceguard97.com, query miners, score
-> them with F1-centric rewards, and log results. On-chain publishing and
-> attestations follow in the next milestone.
+> **Goal for v0:** fetch fresh, consume-once hands from the **local platform backend**,
+> query miners, score them (F1-centric rewards), and push weights on-chain.
 
 ---
 
@@ -19,15 +18,15 @@ evaluation. This guide covers the lean validator scaffold introduced in v0.
 ## 🛠️ Install
 
 ```bash
-git clone https://github.com/AceGuardSN/AceGuardSN
-cd AceGuardSN
+git clone <this-repo>
+cd poker44-subnet
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
 
 ___
-Validators automatically ingest the labeled hands provided by the Aceguard
+Validators automatically ingest the labeled hands provided by the poker44
 adapter. Human hands are chosen randomly out of massive dataset whereas bot hands are created on the fly to generate near perfect poker hands. No manual player list is required; the dataset already contains ground truth labels for bots and humans.
 
 ---
@@ -40,11 +39,17 @@ and pulls **fresh, consume-once** labeled batches from it.
 Set:
 
 ```bash
-export ACEGUARD_PROVIDER=platform
-export ACEGUARD_PLATFORM_BACKEND_URL=http://localhost:3001
-export ACEGUARD_INTERNAL_EVAL_SECRET=dev-internal-eval-secret
+export POKER44_PROVIDER=platform
+export POKER44_PLATFORM_BACKEND_URL=http://localhost:3001
+export POKER44_INTERNAL_EVAL_SECRET=dev-internal-eval-secret
 # Optional:
-export ACEGUARD_REQUIRE_MIXED=true   # require hands include both HUMAN and BOT seats
+export POKER44_REQUIRE_MIXED=true   # require hands include both HUMAN and BOT seats
+export POKER44_AUTOSIMULATE=true   # dev helper: generate hands when buffer is empty
+
+# Optional: announce discoverable rooms (MVP directory)
+export POKER44_DIRECTORY_URL=http://localhost:8010
+export POKER44_DIRECTORY_SHARED_SECRET=dev-secret
+export POKER44_PLATFORM_PUBLIC_URL=http://localhost:3001
 ```
 
 The backend must expose:
@@ -54,7 +59,7 @@ The backend must expose:
 
 ### One-command local stack
 
-From `dPoker/`:
+From `poker44-subnet/`:
 
 ```bash
 chmod +x scripts/validator/p2p/setup.sh
@@ -70,20 +75,20 @@ scripts/validator/p2p/stop.sh
 
 ---
 
-### Register on Subnet 87
+### Register on Testnet (netuid 401)
 
 ```bash
-# Register your validator on Aceguard subnet
+# Register your validator on poker44 subnet
 btcli subnet register \
-  --wallet.name ag_cold \
-  --wallet.hotkey ag_validator \
-  --netuid 87 \
-  --subtensor.network finney
+  --wallet.name poker44-test \
+  --wallet.hotkey default \
+  --netuid 401 \
+  --subtensor.network test
 
 # Check registration status
 btcli wallet overview \
-   --wallet.name ag_cold \
-   --subtensor.network finney
+   --wallet.name poker44-test \
+   --subtensor.network test
 ```
 ---
 
@@ -92,12 +97,12 @@ btcli wallet overview \
 
 #### Run validator using pm2
 ```bash
-pm2 start python --name aceguard_validator -- \
+pm2 start python --name poker44_validator -- \
   ./neurons/validator.py \
-  --netuid 87 \
-  --wallet.name ag_cold \
-  --wallet.hotkey ag_validator \
-  --subtensor.network finney \
+  --netuid 401 \
+  --wallet.name poker44-test \
+  --wallet.hotkey default \
+  --subtensor.network test \
   --logging.debug
 ```
 
@@ -113,16 +118,16 @@ Script for running the validator is at `scripts/validator/run/run_vali.sh`
 
 #### Logs:
 ```
-pm2 logs aceguard_validator
+pm2 logs poker44_validator
 ```
 
 #### Stop / restart / delete:
 ```
-pm2 stop aceguard_validator
+pm2 stop poker44_validator
 
-pm2 restart aceguard_validator
+pm2 restart poker44_validator
 
-pm2 delete aceguard_validator
+pm2 delete poker44_validator
 ```
 
 
@@ -140,7 +145,7 @@ The script currently prints results and sleeps for `poll_interval` seconds befor
 
 ## 🧭 Road to full validator
 
-- ✅ Aceguard ingestion + heuristic scoring loop
+- ✅ poker44 ingestion + heuristic scoring loop
 - ⏳ Persist receipts + publish weights on-chain
 - ⏳ Held-out bot families + early-detection challenges
 - ⏳ Dashboarding and operator-facing APIs

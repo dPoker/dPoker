@@ -18,11 +18,17 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from Aceguard.validator.forward import forward as forward_cycle
-from Aceguard.validator.synapse import DetectionSynapse
+from poker44.validator.forward import forward as forward_cycle
+from poker44.validator.synapse import DetectionSynapse
 from neurons.validator import PlatformBackendProvider
 
-from Aceguard.p2p.directory_client import RoomDirectoryClient
+from poker44.p2p.directory_client import RoomDirectoryClient
+
+
+def _getenv(key: str, default: Optional[str] = None) -> Optional[str]:
+    """Read env var using the `POKER44_` prefix."""
+
+    return os.getenv(f"POKER44_{key}") or default
 
 
 @dataclass
@@ -69,19 +75,19 @@ class MockValidator:
         self.provider = provider
         self.forward_count = 0
         # forward loop uses this for sleep; keep configurable for daemon mode.
-        self.poll_interval = int(os.getenv("ACEGUARD_POLL_INTERVAL_S", "0"))
+        self.poll_interval = int(_getenv("POLL_INTERVAL_S", "0") or "0")
 
         # Keep reward window tiny so one cycle produces rewards in mock mode.
-        self.reward_window = int(os.getenv("ACEGUARD_REWARD_WINDOW", "1"))
+        self.reward_window = int(_getenv("REWARD_WINDOW", "1") or "1")
 
         # Minimal "config" shape used by forward loop.
-        self.config = SimpleNamespace(neuron=SimpleNamespace(timeout=float(os.getenv("ACEGUARD_TIMEOUT_S", "5.0"))))
+        self.config = SimpleNamespace(neuron=SimpleNamespace(timeout=float(_getenv("TIMEOUT_S", "5.0") or "5.0")))
 
         # Minimal metagraph shape: only axons are used in forward loop.
         self.metagraph = SimpleNamespace(axons=[MockAxon(hotkey=f"miner{i}") for i in range(miners)])
 
         # Dendrite mock
-        behaviors = [x.strip() for x in os.getenv("ACEGUARD_MOCK_MINER_BEHAVIORS", "random,random").split(",") if x.strip()]
+        behaviors = [x.strip() for x in (_getenv("MOCK_MINER_BEHAVIORS", "random,random") or "").split(",") if x.strip()]
         self.dendrite = MockDendrite(behaviors)
 
         # Buffers used by forward loop.
@@ -95,13 +101,19 @@ class MockValidator:
         self.latest_rewards = [float(x) for x in rewards_array.tolist()]
 
 
-def _wait_http_ok(url: str, *, timeout_s: float = 30.0, interval_s: float = 0.5) -> None:
+def _wait_http_ok(
+    url: str,
+    *,
+    headers: Optional[dict] = None,
+    timeout_s: float = 30.0,
+    interval_s: float = 0.5,
+) -> None:
     deadline = time.time() + timeout_s
     last_err: Optional[str] = None
     while time.time() < deadline:
         try:
-            r = requests.get(url, timeout=2.0)
-            if r.status_code < 500:
+            r = requests.get(url, headers=headers, timeout=2.0)
+            if r.status_code == 200:
                 return
             last_err = f"status={r.status_code}"
         except Exception as e:
@@ -161,6 +173,7 @@ def _announce_loop(
     directory: RoomDirectoryClient,
     validator_id: str,
     platform_url: str,
+    secret: str,
     room_code: Optional[str],
     region: str,
     capacity_tables: int,
@@ -168,6 +181,19 @@ def _announce_loop(
     interval_s: int,
 ):
     while True:
+        # Best-effort: start the room game as the validator host once enough players joined.
+        # This mirrors the real validator's behavior (neurons/validator.py) but keeps the
+        # local stack runnable without a full bittensor process.
+        if room_code:
+            try:
+                requests.post(
+                    f"{platform_url.rstrip('/')}/internal/rooms/{room_code}/start",
+                    headers={"x-eval-secret": secret, "content-type": "application/json"},
+                    timeout=5.0,
+                )
+            except Exception:
+                pass
+
         try:
             directory.announce(
                 validator_id=validator_id,
@@ -183,35 +209,50 @@ def _announce_loop(
 
 
 async def main() -> int:
-    provider_mode = os.getenv("ACEGUARD_PROVIDER", "platform").strip().lower()
+    provider_mode = (_getenv("PROVIDER", "platform") or "platform").strip().lower()
     if provider_mode != "platform":
-        print("ACEGUARD_PROVIDER must be 'platform' for this runner.")
+        print("POKER44_PROVIDER must be 'platform' for this runner.")
         return 2
 
-    platform_url = os.getenv("ACEGUARD_PLATFORM_BACKEND_URL", "http://localhost:3001").rstrip("/")
-    secret = os.getenv("ACEGUARD_INTERNAL_EVAL_SECRET", "")
+    platform_url = (_getenv("PLATFORM_BACKEND_URL", "http://localhost:3001") or "http://localhost:3001").rstrip("/")
+    secret = _getenv("INTERNAL_EVAL_SECRET", "") or ""
     if not secret:
-        print("Missing ACEGUARD_INTERNAL_EVAL_SECRET")
+        print("Missing POKER44_INTERNAL_EVAL_SECRET")
         return 2
 
-    validator_id = os.getenv("ACEGUARD_VALIDATOR_ID", "vali-dev-1")
-    region = os.getenv("ACEGUARD_REGION", "unknown")
-    version_hash = os.getenv("ACEGUARD_VERSION_HASH", "dpoker-validator-p2p-v0")
-    capacity_tables = int(os.getenv("ACEGUARD_CAPACITY_TABLES", "1"))
+    validator_id = _getenv("VALIDATOR_ID", "vali-dev-1") or "vali-dev-1"
+    region = _getenv("REGION", "unknown") or "unknown"
+    version_hash = _getenv("VERSION_HASH", "poker44-validator-p2p-v0") or "poker44-validator-p2p-v0"
+    capacity_tables = int(_getenv("CAPACITY_TABLES", "1") or "1")
 
-    directory_url = os.getenv("ACEGUARD_DIRECTORY_URL", "http://localhost:8010").rstrip("/")
-    directory_secret = os.getenv("ACEGUARD_DIRECTORY_SHARED_SECRET", "dev-secret")
-    announce_interval_s = int(os.getenv("ACEGUARD_ANNOUNCE_INTERVAL_S", "10"))
+    directory_url = (_getenv("DIRECTORY_URL", "http://localhost:8010") or "").rstrip("/")
+    directory_secret = _getenv("DIRECTORY_SHARED_SECRET", "dev-secret") or "dev-secret"
+    announce_interval_s = int(_getenv("ANNOUNCE_INTERVAL_S", "10") or "10")
 
     # Health checks
     _wait_http_ok(f"{platform_url}/health/live", timeout_s=60.0)
-    _wait_http_ok(f"{platform_url}/internal/eval/health", timeout_s=60.0)
+    _wait_http_ok(
+        f"{platform_url}/internal/eval/health",
+        headers={"x-eval-secret": secret},
+        timeout_s=60.0,
+    )
+    _wait_http_ok(
+        f"{platform_url}/internal/rooms/health",
+        headers={"x-eval-secret": secret},
+        timeout_s=60.0,
+    )
 
     # Ensure there is a discoverable room code to announce.
     room_code = _ensure_room(platform_url, secret, validator_id=validator_id)
+    if not room_code:
+        print(
+            "Failed to ensure advertised room. "
+            "Check INTERNAL_EVAL_SECRET and platform backend logs."
+        )
+        return 2
 
     # Seed some hands so /internal/eval/next returns data for evaluation.
-    if os.getenv("ACEGUARD_SEED_ON_START", "true").lower() != "false":
+    if (_getenv("SEED_ON_START", "true") or "true").lower() != "false":
         _seed_if_needed(platform_url, secret)
 
     # Start directory announcer in background (best-effort).
@@ -223,6 +264,7 @@ async def main() -> int:
                 "directory": directory,
                 "validator_id": validator_id,
                 "platform_url": platform_url,
+                "secret": secret,
                 "room_code": room_code,
                 "region": region,
                 "capacity_tables": capacity_tables,
@@ -242,10 +284,10 @@ async def main() -> int:
             print(f"[directory] list failed: {e}")
 
     # Create provider and run ONE forward cycle using a mock bittensor layer.
-    provider = PlatformBackendProvider(platform_url, secret, require_mixed=os.getenv("ACEGUARD_REQUIRE_MIXED", "true").lower() != "false")
-    validator = MockValidator(provider=provider, miners=int(os.getenv("ACEGUARD_MOCK_MINERS", "2")))
+    provider = PlatformBackendProvider(platform_url, secret, require_mixed=(_getenv("REQUIRE_MIXED", "true") or "true").lower() != "false")
+    validator = MockValidator(provider=provider, miners=int(_getenv("MOCK_MINERS", "2") or "2"))
 
-    run_forever = os.getenv("ACEGUARD_RUN_FOREVER", "false").lower() == "true"
+    run_forever = (_getenv("RUN_FOREVER", "false") or "false").lower() == "true"
     if not run_forever:
         await forward_cycle(validator)
         print(f"[mock] forward complete. latest_rewards={validator.latest_rewards}")

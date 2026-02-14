@@ -1,6 +1,6 @@
-# 🛠️ Aceguard Miner Guide
+# 🛠️ poker44 Miner Guide
 
-Aceguard treats miners as bot-hunters: your job is to classify chunks, where each chunk contain multiple batches and each batches are made up of multiple poker hands and then 
+poker44 treats miners as bot-hunters: your job is to classify chunks, where each chunk contain multiple batches and each batches are made up of multiple poker hands and then 
 return a bot classification result per batch. Validators curate labeled hands from a
 controlled poker environment & real human hands and reward miners who deliver
 accurate, low–false-positive predictions.
@@ -15,8 +15,8 @@ how validators translate your responses into on-chain incentives.
 ## 🛠️ Install
 
 ```bash
-git clone https://github.com/AceGuardSN/AceGuardSN
-cd AceGuardSN
+git clone <this-repo>
+cd poker44-subnet
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -31,25 +31,25 @@ live:
 
 ```bash
 btcli wallet new_coldkey --wallet.name my_cold
-btcli wallet new_hotkey  --wallet.name my_cold --wallet.hotkey my_aceguard_hotkey
+btcli wallet new_hotkey  --wallet.name my_cold --wallet.hotkey my_poker44_hotkey
 ```
 
 ---
 
-### Register on Subnet 87
+### Register on Testnet (netuid 401)
 
 ```bash
-# Register your miner on Aceguard subnet
+# Register your miner on poker44 subnet
 btcli subnet register \
   --wallet.name my_cold \
-  --wallet.hotkey my_aceguard_hotkey \
-  --netuid 87 \
-  --subtensor.network finney
+  --wallet.hotkey my_poker44_hotkey \
+  --netuid 401 \
+  --subtensor.network test
 
 # Check registration status
 btcli wallet overview \
    --wallet.name my_cold \
-   --subtensor.network finney
+   --subtensor.network test
 ```
 
 ---
@@ -70,16 +70,16 @@ Script for running the miner is at `scripts/miner/run/run_miner.sh`
 
 #### Logs:
 ```
-pm2 logs aceguard_miner
+pm2 logs poker44_miner
 ```
 
 #### Stop / restart / delete:
 ```
-pm2 stop aceguard_miner
+pm2 stop poker44_miner
 
-pm2 restart aceguard_miner
+pm2 restart poker44_miner
 
-pm2 delete aceguard_miner
+pm2 delete poker44_miner
 ```
 
 

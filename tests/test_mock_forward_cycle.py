@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Dict, List
 
-from Aceguard.core.models import LabeledHandBatch
-from Aceguard.validator.forward import forward as forward_cycle
-from Aceguard.validator.synapse import DetectionSynapse
+from poker44.core.models import LabeledHandBatch
+from poker44.validator.forward import forward as forward_cycle
+from poker44.validator.synapse import DetectionSynapse
 
 
 class StaticProvider:

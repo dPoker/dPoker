@@ -1,4 +1,4 @@
-from Aceguard.p2p.crypto import hmac_sign, hmac_verify
+from poker44.p2p.crypto import hmac_sign, hmac_verify
 
 
 def test_hmac_roundtrip():

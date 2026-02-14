@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# AceGuard Validator Startup Script
+# poker44 Validator Startup Script
 
-NETUID=294  ## 87 if mainnet, 294 if testnet
-WALLET_NAME="aceguard-test-ck"
-HOTKEY="aceguard-hk"
-NETWORK="test"  ## "finney" for mainnet; "test" for testnet
+NETUID="${NETUID:-401}"
+WALLET_NAME="${WALLET_NAME:-poker44-test}"
+HOTKEY="${HOTKEY:-default}"
+NETWORK="${NETWORK:-test}"  ## "finney" for mainnet; "test" for testnet
 VALIDATOR_SCRIPT="./neurons/validator.py"
-PM2_NAME="aceguard_validator"  ##  name of validator, as you wish
+PM2_NAME="${PM2_NAME:-poker44_validator}"  ## name of validator, as you wish
 
 if [ ! -f "$VALIDATOR_SCRIPT" ]; then
     echo "Error: Validator script not found at $VALIDATOR_SCRIPT"
@@ -21,7 +21,7 @@ fi
 
 pm2 delete $PM2_NAME 2>/dev/null || true
 
-export PYTHONPATH="/root/AceGuardSN"
+export PYTHONPATH="$(pwd)"
 
 pm2 start $VALIDATOR_SCRIPT \
   --name $PM2_NAME -- \
