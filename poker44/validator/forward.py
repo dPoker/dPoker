@@ -7,6 +7,7 @@ import asyncio
 import traceback
 import time
 import os
+import random
 from typing import Dict, List, Sequence
 
 import bittensor as bt
@@ -16,6 +17,96 @@ from poker44.score.scoring import reward
 from poker44.validator.synapse import DetectionSynapse
 
 from poker44.validator.constants import BURN_EMISSIONS, BURN_FRACTION, KEEP_FRACTION, UID_ZERO
+
+
+def _parse_csv_env(name: str) -> list[str]:
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return []
+    return [x.strip() for x in raw.split(",") if x.strip()]
+
+
+def _unique_ints(items: list[int]) -> list[int]:
+    out: list[int] = []
+    seen: set[int] = set()
+    for x in items:
+        if x in seen:
+            continue
+        seen.add(x)
+        out.append(x)
+    return out
+
+
+def _select_miner_uids(validator) -> list[int]:
+    """
+    Select which miners to query for this forward cycle.
+
+    By default we avoid querying the full metagraph on public networks to keep
+    cycles bounded and make testnet/dev easier.
+
+    Overrides:
+      - POKER44_QUERY_UIDS="1,2,3"
+      - POKER44_QUERY_HOTKEYS="<ss58>,<ss58>"
+      - POKER44_QUERY_SAMPLE_SIZE="20"
+      - POKER44_QUERY_INCLUDE_SELF="true" (default: false)
+    """
+    n = int(getattr(validator.metagraph, "n", len(getattr(validator.metagraph, "axons", []))))
+    all_uids = list(range(n))
+
+    include_self = (os.getenv("POKER44_QUERY_INCLUDE_SELF") or "false").strip().lower() == "true"
+    self_uid = getattr(validator, "uid", None)
+    if not include_self and isinstance(self_uid, int):
+        all_uids = [u for u in all_uids if u != self_uid]
+
+    explicit_uids = _parse_csv_env("POKER44_QUERY_UIDS")
+    if explicit_uids:
+        picked: list[int] = []
+        for raw in explicit_uids:
+            try:
+                uid = int(raw)
+            except Exception:
+                continue
+            if 0 <= uid < n:
+                if not include_self and isinstance(self_uid, int) and uid == self_uid:
+                    continue
+                picked.append(uid)
+        picked = _unique_ints(picked)
+        if picked:
+            return picked
+
+    explicit_hotkeys = _parse_csv_env("POKER44_QUERY_HOTKEYS")
+    if explicit_hotkeys:
+        picked = []
+        hotkeys = getattr(validator.metagraph, "hotkeys", [])
+        for hk in explicit_hotkeys:
+            try:
+                uid = hotkeys.index(hk)
+            except ValueError:
+                continue
+            if not include_self and isinstance(self_uid, int) and uid == self_uid:
+                continue
+            if 0 <= uid < n:
+                picked.append(uid)
+        picked = _unique_ints(picked)
+        if picked:
+            return picked
+
+    # Default: sample a bounded subset.
+    try:
+        sample_size = int(os.getenv("POKER44_QUERY_SAMPLE_SIZE") or "20")
+    except Exception:
+        sample_size = 20
+    sample_size = max(1, min(200, sample_size))
+
+    if not all_uids:
+        # Edge case: only self exists and include_self=false. Fall back to self if present.
+        if include_self and isinstance(self_uid, int):
+            return [self_uid]
+        return []
+
+    if len(all_uids) <= sample_size:
+        return all_uids
+    return random.sample(all_uids, sample_size)
 
 
 async def forward(validator) -> None:
@@ -85,7 +176,20 @@ async def _run_forward_cycle(validator) -> None:
         return
     
     axons = validator.metagraph.axons
-    miner_uids = list(range(len(axons)))
+    miner_uids = _select_miner_uids(validator)
+    if not miner_uids:
+        bt.logging.info("No miner uids selected; sleeping.")
+        await asyncio.sleep(validator.poll_interval)
+        return
+
+    pairs = [(int(uid), axons[int(uid)]) for uid in miner_uids if 0 <= int(uid) < len(axons)]
+    miner_uids = [uid for uid, _ in pairs]
+    axons_to_query = [axon for _, axon in pairs]
+    if not miner_uids:
+        bt.logging.info("No valid miner uids selected; sleeping.")
+        await asyncio.sleep(validator.poll_interval)
+        return
+
     responses: Dict[int, List[float]] = {uid: [] for uid in miner_uids}
     
     # Prepare chunks and labels
@@ -132,11 +236,13 @@ async def _run_forward_cycle(validator) -> None:
             timeout = 20
     
     total_hands = sum(len(chunk) for chunk in chunks)
-    bt.logging.info(f"Querying {len(axons)} miners with {len(chunks)} chunks ({total_hands} total hands)...")
+    bt.logging.info(
+        f"Querying {len(axons_to_query)} miners with {len(chunks)} chunks ({total_hands} total hands)..."
+    )
     
     synapse_responses = await _dendrite_with_retries(
         validator.dendrite,
-        axons=axons,
+        axons=axons_to_query,
         synapse=synapse,
         timeout=timeout,
         attempts=3,

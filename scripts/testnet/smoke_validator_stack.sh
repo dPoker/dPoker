@@ -74,10 +74,12 @@ if [ -n "$directory_url" ]; then
   curl -sf "$directory_url/healthz" >/dev/null
 
   log "Checking directory rooms listing"
-  rooms_json="$(curl -sf "$directory_url/rooms")"
-
   if [ -n "$validator_id" ]; then
-    listed="$(python3 - <<'PY'
+    # Announcements are async; give the validator a moment to publish.
+    deadline="$(( $(date +%s) + 45 ))"
+    while true; do
+      rooms_json="$(curl -sf "$directory_url/rooms")"
+      listed="$(python3 - <<'PY'
 import json,sys
 validator_id=sys.argv[1]
 rooms=json.load(sys.stdin)
@@ -90,14 +92,20 @@ if isinstance(rooms, list):
 print("true" if ok else "false")
 PY
 "$validator_id" <<<"$rooms_json")"
-    if [ "$listed" != "true" ]; then
-      die "Directory does not list this validator_id yet (POKER44_VALIDATOR_ID=$validator_id)"
-    fi
-    log "Directory lists validator_id=$validator_id"
+
+      if [ "$listed" = "true" ]; then
+        log "Directory lists validator_id=$validator_id"
+        break
+      fi
+      now="$(date +%s)"
+      if [ "$now" -ge "$deadline" ]; then
+        die "Directory does not list this validator_id yet (POKER44_VALIDATOR_ID=$validator_id)"
+      fi
+      sleep 0.5
+    done
   else
     log "POKER44_VALIDATOR_ID not set; skipping directory self-match check"
   fi
 fi
 
 log "Smoke OK"
-
