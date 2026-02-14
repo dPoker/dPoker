@@ -39,25 +39,50 @@ async def _run_forward_cycle(validator) -> None:
         n = 10
     n = max(1, min(200, n))
 
-    pending: List = getattr(validator, "_pending_batches", [])
-    if not isinstance(pending, list):
-        pending = []
+    # NOTE: forward() may run concurrently (configurable). We only lock around
+    # buffer operations to avoid double-consuming tasks.
+    lock = getattr(validator, "lock", None)
+    batches = None
+    buffered = 0
+    if lock is not None:
+        async with lock:
+            pending: List = getattr(validator, "_pending_batches", [])
+            if not isinstance(pending, list):
+                pending = []
 
-    # Fill the buffer up to N (avoid over-consuming hands from the provider).
-    need = max(0, n - len(pending))
-    if need > 0:
-        new_batches = validator.provider.fetch_hand_batch(limit=need)
-        if new_batches:
-            pending.extend(new_batches)
-        validator._pending_batches = pending
+            # Fill the buffer up to N (avoid over-consuming hands from the provider).
+            need = max(0, n - len(pending))
+            if need > 0:
+                new_batches = validator.provider.fetch_hand_batch(limit=need)
+                if new_batches:
+                    pending.extend(new_batches)
+                validator._pending_batches = pending
 
-    if len(pending) < n:
-        bt.logging.info(f"Buffered {len(pending)}/{n} eval batches; sleeping.")
+            buffered = len(pending)
+            if buffered >= n:
+                batches = pending[:n]
+                validator._pending_batches = pending[n:]
+    else:
+        pending: List = getattr(validator, "_pending_batches", [])
+        if not isinstance(pending, list):
+            pending = []
+
+        need = max(0, n - len(pending))
+        if need > 0:
+            new_batches = validator.provider.fetch_hand_batch(limit=need)
+            if new_batches:
+                pending.extend(new_batches)
+            validator._pending_batches = pending
+
+        buffered = len(pending)
+        if buffered >= n:
+            batches = pending[:n]
+            validator._pending_batches = pending[n:]
+
+    if not batches:
+        bt.logging.info(f"Buffered {buffered}/{n} eval batches; sleeping.")
         await asyncio.sleep(validator.poll_interval)
         return
-
-    batches = pending[:n]
-    validator._pending_batches = pending[n:]
     
     axons = validator.metagraph.axons
     miner_uids = list(range(len(axons)))
