@@ -61,6 +61,13 @@ chmod +x scripts/validator/p2p/setup.sh
 scripts/validator/p2p/setup.sh
 ```
 
+To stop the local stack:
+
+```bash
+chmod +x scripts/validator/p2p/stop.sh
+scripts/validator/p2p/stop.sh
+```
+
 ---
 
 ### Register on Subnet 87
