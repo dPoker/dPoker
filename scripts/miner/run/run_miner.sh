@@ -8,6 +8,8 @@ HOTKEY="${HOTKEY:-miner1}"
 NETWORK="${NETWORK:-test}"  ## "finney" for mainnet; "test" for testnet
 MINER_SCRIPT="./neurons/miner.py"
 PM2_NAME="${PM2_NAME:-poker44_miner}"  ## name of Miner, as you wish
+FORCE_VALIDATOR_PERMIT="${FORCE_VALIDATOR_PERMIT:-false}"
+ALLOW_NON_REGISTERED="${ALLOW_NON_REGISTERED:-false}"
 
 if [ ! -f "$MINER_SCRIPT" ]; then
     echo "Error: Miner script not found at $MINER_SCRIPT"
@@ -23,15 +25,22 @@ pm2 delete $PM2_NAME 2>/dev/null || true
 
 export PYTHONPATH="$(pwd)"
 
+EXTRA_ARGS=()
+if [ "${FORCE_VALIDATOR_PERMIT,,}" = "true" ]; then
+  EXTRA_ARGS+=(--blacklist.force_validator_permit)
+fi
+if [ "${ALLOW_NON_REGISTERED,,}" = "true" ]; then
+  EXTRA_ARGS+=(--blacklist.allow_non_registered)
+fi
+
 pm2 start $MINER_SCRIPT \
   --name $PM2_NAME -- \
   --netuid $NETUID \
   --wallet.name $WALLET_NAME \
   --wallet.hotkey $HOTKEY \
   --subtensor.network $NETWORK \
-  --blacklist.force_validator_permit \
-  --blacklist.allow_non_registered false \
-    --logging.debug
+  "${EXTRA_ARGS[@]}" \
+  --logging.debug
 
 pm2 save
 
