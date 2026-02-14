@@ -115,7 +115,19 @@ rooms=requests.get("http://127.0.0.1:$directory_port/rooms", timeout=5).json()
 print(json.dumps(rooms, indent=2))
 PY
 
+start_daemon="${START_DAEMON:-true}"
+if [ "${start_daemon,,}" != "false" ]; then
+  log "Starting mock validator daemon (periodic announce + eval cycles)"
+  export ACEGUARD_RUN_FOREVER="true"
+  export ACEGUARD_POLL_INTERVAL_S="${ACEGUARD_POLL_INTERVAL_S:-10}"
+  nohup python scripts/validator/p2p/run_mock_validator.py >"$dpoker_dir/.mock_validator.log" 2>&1 &
+  mock_validator_pid=$!
+  echo "$mock_validator_pid" >"$dpoker_dir/.mock_validator.pid"
+  log "Mock validator pid: $mock_validator_pid (log: $dpoker_dir/.mock_validator.log)"
+fi
+
 log "Setup complete."
 log "Tail logs:"
 log "  platform:  tail -f $platform_dir/.platform_backend.log"
 log "  directory: tail -f $dpoker_dir/.room_directory.log"
+log "  validator:  tail -f $dpoker_dir/.mock_validator.log"
