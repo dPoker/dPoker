@@ -333,13 +333,17 @@ class Validator(BaseValidatorNeuron):
         def _loop() -> None:
             nonlocal room_code
             while True:
-                # Retry ensure if platform wasn't ready on startup.
-                if not room_code and provider_mode == "platform":
-                    room_code = self._ensure_room_code(
+                # Ensure the advertised room exists and stays fresh.
+                # Room JSON in Redis has a TTL, while player->room mappings are non-expiring.
+                # Periodically re-ensuring lets the platform recreate rooms if they expired.
+                if provider_mode == "platform":
+                    ensured = self._ensure_room_code(
                         platform_url=platform_base_url,
                         secret=internal_secret,
                         validator_id=validator_id,
                     )
+                    if ensured:
+                        room_code = ensured
 
                 # Best-effort: start the room game as the validator host once enough players joined.
                 self._maybe_start_room(
