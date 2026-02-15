@@ -11,6 +11,7 @@ def test_directory_announce_and_list():
 
     payload = {
         "validator_id": "vali-1",
+        "validator_name": "poker44-validator",
         "platform_url": "http://localhost:3001",
         "room_code": "ABC123",
         "region": "eu",
@@ -30,12 +31,14 @@ def test_directory_announce_and_list():
     assert isinstance(rooms, list)
     assert len(rooms) >= 1
     assert rooms[0]["validator_id"] == "vali-1"
+    assert rooms[0]["validator_name"] == "poker44-validator"
 
 
 def test_directory_rejects_bad_signature():
     client = TestClient(app)
     payload = {
         "validator_id": "vali-bad",
+        "validator_name": "poker44-validator",
         "platform_url": "http://localhost:3001",
         "room_code": None,
         "region": "eu",
@@ -46,4 +49,3 @@ def test_directory_rejects_bad_signature():
     }
     r = client.post("/announce", json=payload)
     assert r.status_code == 401
-
