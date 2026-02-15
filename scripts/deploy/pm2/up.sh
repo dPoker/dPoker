@@ -289,9 +289,12 @@ pm2 start npm \
 
 log "Starting platform frontend (PM2: $frontend_name)"
 pm2_delete_if_exists "$frontend_name"
-# Next dev + Turbopack expects this folder in some scenarios; it can disappear if
-# a production `next build` runs in the same workspace. Creating it is harmless.
-mkdir -p "$platform_frontend_dir/.next/static/development" >/dev/null 2>&1 || true
+# Run the dev server with an isolated dist dir. This prevents `next build`
+# (e.g., husky pre-push) from corrupting a running `next dev` instance.
+frontend_dist_dir="${NEXT_DIST_DIR:-.next-dev}"
+# Next dev + Turbopack expects this folder in some scenarios.
+mkdir -p "$platform_frontend_dir/$frontend_dist_dir/static/development" >/dev/null 2>&1 || true
+NEXT_DIST_DIR="$frontend_dist_dir" \
 NEXT_PUBLIC_API_URL="${platform_url}/api/v1" \
 NEXT_PUBLIC_WS_URL="$platform_url" \
 NEXT_PUBLIC_DIRECTORY_URL="$directory_url" \
