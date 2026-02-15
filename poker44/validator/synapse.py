@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import ClassVar, List, Optional
 
 import bittensor as bt
 from pydantic import ConfigDict, Field
-
-from poker44.core.models import HandHistory
 
 
 class DetectionSynapse(bt.Synapse):
@@ -24,7 +22,7 @@ class DetectionSynapse(bt.Synapse):
     predictions: Optional[List[bool]] = None    # One prediction per chunk
 
     # Tell Bittensor to send chunks in the body, not headers
-    required_hash_fields: List[str] = ["chunks"]
+    required_hash_fields: ClassVar[List[str]] = ["chunks"]
 
     def deserialize(self) -> "DetectionSynapse":
         """Deserialize chunks back into HandHistory objects if needed."""

@@ -5,7 +5,7 @@ Core data models used within the poker44 subnet.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Mapping, Optional, Sequence
 
 
@@ -85,17 +85,32 @@ class ActionEvent:
     @classmethod
     def from_payload(cls, payload: Mapping[str, object], hand_id: str) -> "ActionEvent":
         ts = payload.get("timestamp_action")
-        try:
-            parsed_ts = datetime.fromisoformat(ts) if isinstance(ts, str) else datetime.utcfromtimestamp(float(ts))
-        except Exception:
-            parsed_ts = datetime.utcnow()
-        def _parse_dt(value):
-            if isinstance(value, str):
-                try:
-                    return datetime.fromisoformat(value)
-                except Exception:
-                    return None
-            return None
+
+        def _parse_dt(value: object) -> Optional[datetime]:
+            if not isinstance(value, str) or not value:
+                return None
+            try:
+                dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except Exception:
+                return None
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+
+        def _parse_ts(value: object) -> datetime:
+            if isinstance(value, str) and value:
+                dt = _parse_dt(value)
+                if dt is not None:
+                    return dt
+                return datetime.now(timezone.utc)
+            if value is None:
+                return datetime.now(timezone.utc)
+            try:
+                return datetime.fromtimestamp(float(value), tz=timezone.utc)
+            except Exception:
+                return datetime.now(timezone.utc)
+
+        parsed_ts = _parse_ts(ts)
 
         return cls(
             action_id=str(payload.get("action_id") or payload.get("id")),
