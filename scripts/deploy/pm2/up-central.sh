@@ -182,6 +182,7 @@ NEXT_DIST_DIR="$frontend_dist_dir" \
 NEXT_PUBLIC_DIRECTORY_URL="$directory_url" \
 NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-http://127.0.0.1:3001/api/v1}" \
 NEXT_PUBLIC_WS_URL="${NEXT_PUBLIC_WS_URL:-http://127.0.0.1:3001}" \
+NEXT_PUBLIC_LEDGER_API_URL="${NEXT_PUBLIC_LEDGER_API_URL:-http://127.0.0.1:7001/api/v1}" \
 pm2 start npm \
   --name "$frontend_name" \
   --cwd "$platform_frontend_dir" \
@@ -202,4 +203,3 @@ log "Open:"
 log "  $frontend_url/poker-gameplay/p2p"
 log "Directory:"
 log "  $directory_url/rooms"
-

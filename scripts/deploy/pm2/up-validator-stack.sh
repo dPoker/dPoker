@@ -127,12 +127,41 @@ validator_name="${pm2_prefix}-validator-${network}-${validator_hotkey}"
 
 internal_eval_secret="${INTERNAL_EVAL_SECRET:-dev-internal-eval-secret}"
 cors_origins="${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}"
+jwt_secret="${JWT_SECRET:-dev-jwt-secret-minimum-32-characters-long}"
+ledger_api_url="${LEDGER_API_URL:-}"
 
 start_port="$(pick_start_port)"
 backend_port="${BACKEND_PORT:-}"
 if [[ -z "$backend_port" ]]; then
   backend_port="$(find_free_port "$start_port")" || die "Failed to find a free backend port near $start_port"
 fi
+
+# Indexer (per-validator read API)
+indexer_port="${INDEXER_PORT:-}"
+if [[ -z "$indexer_port" ]]; then
+  indexer_port="$(find_free_port "$((backend_port + 1))")" || die "Failed to find a free indexer port"
+fi
+indexer_public_url="${POKER44_INDEXER_PUBLIC_URL:-http://127.0.0.1:${indexer_port}}"
+indexer_public_url="${indexer_public_url%/}"
+indexer_tee_enabled="${INDEXER_TEE_ENABLED:-true}"
+
+# Postgres/Redis (per-validator)
+compose_project="${COMPOSE_PROJECT_NAME:-$pm2_prefix}"
+postgres_port="${POSTGRES_PORT:-}"
+redis_port="${REDIS_PORT:-}"
+if [[ -z "$postgres_port" ]]; then
+  postgres_port="$(find_free_port "$((indexer_port + 200))")" || die "Failed to find a free Postgres port"
+fi
+if [[ -z "$redis_port" ]]; then
+  redis_port="$(find_free_port "$((postgres_port + 1))")" || die "Failed to find a free Redis port"
+fi
+
+postgres_user="${POSTGRES_USER:-poker44}"
+postgres_password="${POSTGRES_PASSWORD:-poker44_local_pwd}"
+safe_hotkey="$(echo "$validator_hotkey" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_')"
+postgres_db="${POSTGRES_DB:-poker44_poker_${safe_hotkey:-validator}}"
+database_url="postgresql://${postgres_user}:${postgres_password}@localhost:${postgres_port}/${postgres_db}"
+redis_url="redis://localhost:${redis_port}"
 
 # Platform is local to the validator process. (Public URL may differ; override via env.)
 platform_base_url="http://127.0.0.1:${backend_port}"
@@ -155,9 +184,14 @@ log "Repo: $repo_dir"
 log "Platform backend: $platform_backend_dir"
 log "Platform base URL:   $platform_base_url"
 log "Platform public URL: $platform_public_url"
+log "Indexer public URL:  $indexer_public_url"
 log "Directory URL: ${directory_url:-<disabled>}"
+log "Ledger API URL: ${ledger_api_url:-<disabled>}"
 log "PM2 prefix: $pm2_prefix"
 log "Python venv: $venv_dir"
+log "Compose project: $compose_project"
+log "Postgres: port=$postgres_port db=$postgres_db"
+log "Redis:    port=$redis_port"
 
 log "Preparing python venv (validator): $venv_dir"
 if [ ! -d "$venv_dir" ]; then
@@ -193,16 +227,44 @@ fi
 if [ ! -d node_modules ]; then
   npm install
 fi
+COMPOSE_PROJECT_NAME="$compose_project" \
+POSTGRES_PORT="$postgres_port" \
+REDIS_PORT="$redis_port" \
+POSTGRES_USER="$postgres_user" \
+POSTGRES_PASSWORD="$postgres_password" \
+POSTGRES_DB="$postgres_db" \
 npm run docker:up
+
+log "Waiting for Postgres/Redis health (validator stack)"
+deadline="$(( $(date +%s) + 90 ))"
+while true; do
+  if COMPOSE_PROJECT_NAME="$compose_project" docker compose exec -T postgres \
+    pg_isready -U "$postgres_user" -d "$postgres_db" >/dev/null 2>&1 \
+    && COMPOSE_PROJECT_NAME="$compose_project" docker compose exec -T redis \
+    redis-cli ping >/dev/null 2>&1; then
+    break
+  fi
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    die "timeout waiting for Postgres/Redis for validator stack (project=$compose_project)"
+  fi
+  sleep 1
+done
+
+DATABASE_URL="$database_url" \
 npm run migration:run:dev
 
 log "Starting platform backend (PM2: $backend_name)"
 pm2_delete_if_exists "$backend_name"
 PORT="$backend_port" \
+DATABASE_URL="$database_url" \
+REDIS_URL="$redis_url" \
 INTERNAL_EVAL_SECRET="$internal_eval_secret" \
 CORS_ORIGINS="$cors_origins" \
+JWT_SECRET="$jwt_secret" \
 JWT_EXPIRES_IN="${JWT_EXPIRES_IN:-30d}" \
 COOKIE_MAX_AGE="${COOKIE_MAX_AGE:-2592000000}" \
+LEDGER_API_URL="$ledger_api_url" \
+POKER44_VALIDATOR_ID="${POKER44_VALIDATOR_ID:-$validator_ss58}" \
 pm2 start npm \
   --name "$backend_name" \
   --cwd "$platform_backend_dir" \
@@ -213,6 +275,28 @@ log "Waiting for platform backend health"
 wait_http "$platform_base_url/health/live" 90
 
 # ---------------------------------------------------------------------------
+# Indexer (per-validator read API)
+# ---------------------------------------------------------------------------
+indexer_name="${pm2_prefix}-indexer"
+log "Starting validator indexer (PM2: $indexer_name)"
+pm2_delete_if_exists "$indexer_name"
+
+INDEXER_WALLET_NAME="$validator_wallet" \
+INDEXER_WALLET_HOTKEY="$validator_hotkey" \
+INDEXER_VALIDATOR_NAME="$validator_friendly_name" \
+INDEXER_TEE_ENABLED="$indexer_tee_enabled" \
+INDEXER_DIRECTORY_URL="$directory_url" \
+pm2 start "$venv_dir/bin/python" \
+  --name "$indexer_name" \
+  --cwd "$repo_dir" \
+  -- \
+  -m uvicorn poker44.p2p.indexer.app:app \
+  --host 0.0.0.0 --port "$indexer_port"
+
+log "Waiting for indexer health"
+wait_http "http://127.0.0.1:${indexer_port}/healthz" 60
+
+# ---------------------------------------------------------------------------
 # Validator
 # ---------------------------------------------------------------------------
 log "Starting bittensor validator (PM2: $validator_name)"
@@ -221,6 +305,7 @@ pm2_delete_if_exists "$validator_name"
 POKER44_PROVIDER="platform" \
 POKER44_PLATFORM_BACKEND_URL="$platform_base_url" \
 POKER44_PLATFORM_PUBLIC_URL="$platform_public_url" \
+POKER44_INDEXER_PUBLIC_URL="$indexer_public_url" \
 POKER44_INTERNAL_EVAL_SECRET="$internal_eval_secret" \
 POKER44_DIRECTORY_URL="$directory_url" \
 POKER44_DIRECTORY_SHARED_SECRET="$directory_secret" \
@@ -261,6 +346,7 @@ fi
 log "Up."
 log "Platform backend:"
 log "  $platform_base_url"
+log "Indexer:"
+log "  http://127.0.0.1:${indexer_port}"
 log "Validator:"
 log "  pm2 logs \"$validator_name\""
-

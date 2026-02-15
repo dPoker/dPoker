@@ -38,6 +38,30 @@ def _unique_ints(items: list[int]) -> list[int]:
     return out
 
 
+def _axon_is_serving(axon) -> bool:  # noqa: ANN001 - depends on bittensor version
+    """
+    Best-effort axon liveness check.
+
+    On real networks, the metagraph can contain validators (axon_off) or stale
+    registrations. Querying non-serving axons creates noisy connection errors.
+    """
+    try:
+        v = getattr(axon, "is_serving", None)
+        if v is not None:
+            return bool(v)
+    except Exception:
+        pass
+
+    try:
+        ip = str(getattr(axon, "ip", "") or "").strip()
+        port = int(getattr(axon, "port", 0) or 0)
+        if not ip or ip in ("0.0.0.0",) or port <= 0:
+            return False
+        return True
+    except Exception:
+        return False
+
+
 def _select_miner_uids(validator) -> list[int]:
     """
     Select which miners to query for this forward cycle.
@@ -53,6 +77,18 @@ def _select_miner_uids(validator) -> list[int]:
     """
     n = int(getattr(validator.metagraph, "n", len(getattr(validator.metagraph, "axons", []))))
     all_uids = list(range(n))
+
+    # Filter to serving axons by default (avoid validators/disabled peers).
+    # If we cannot determine serving status (e.g. mocked metagraph in tests),
+    # keep the original uid set.
+    try:
+        axons = getattr(validator.metagraph, "axons", [])
+        if axons and len(axons) >= n:
+            serving = [u for u in all_uids if _axon_is_serving(axons[u])]
+            if serving:
+                all_uids = serving
+    except Exception:
+        pass
 
     include_self = (os.getenv("POKER44_QUERY_INCLUDE_SELF") or "false").strip().lower() == "true"
     self_uid = getattr(validator, "uid", None)

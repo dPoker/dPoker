@@ -11,6 +11,9 @@ class ValidatorAnnounce(BaseModel):
     validator_name: str = "poker44-validator"
     # Base URL where humans connect to play poker on this validator
     platform_url: str
+    # Base URL where other peers/clients can query this validator's indexer/read API.
+    # In local dev this will typically be http://127.0.0.1:<port>
+    indexer_url: Optional[str] = None
     # A room code that is open for discovery (optional; depends on platform UX)
     room_code: Optional[str] = None
 
@@ -27,6 +30,7 @@ class RoomListing(BaseModel):
     validator_id: str
     validator_name: str = "poker44-validator"
     platform_url: str
+    indexer_url: Optional[str] = None
     room_code: Optional[str] = None
     region: str
     capacity_tables: int

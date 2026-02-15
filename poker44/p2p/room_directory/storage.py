@@ -14,6 +14,7 @@ class InMemoryDirectory:
             validator_id=ann.validator_id,
             validator_name=ann.validator_name,
             platform_url=ann.platform_url,
+            indexer_url=ann.indexer_url,
             room_code=ann.room_code,
             region=ann.region,
             capacity_tables=ann.capacity_tables,

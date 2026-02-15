@@ -320,6 +320,7 @@ class Validator(BaseValidatorNeuron):
 
         platform_base_url = (os.getenv("POKER44_PLATFORM_BACKEND_URL") or "http://localhost:3001").strip()
         platform_public_url = (os.getenv("POKER44_PLATFORM_PUBLIC_URL") or platform_base_url).strip().rstrip("/")
+        indexer_public_url = (os.getenv("POKER44_INDEXER_PUBLIC_URL") or "").strip().rstrip("/") or None
         internal_secret = (os.getenv("POKER44_INTERNAL_EVAL_SECRET") or "").strip()
 
         # Prefer a fixed room code if provided; otherwise ensure one exists via the local platform backend.
@@ -360,6 +361,7 @@ class Validator(BaseValidatorNeuron):
                         validator_id=validator_id,
                         validator_name=validator_name,
                         platform_url=platform_public_url,
+                        indexer_url=indexer_public_url,
                         room_code=room_code,
                         region=region,
                         capacity_tables=capacity_tables,

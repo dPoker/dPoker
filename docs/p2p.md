@@ -1,19 +1,21 @@
-# Poker44 P2P Stack (Subnet + Platform)
+# Poker44 P2P Stack (Subnet + Platform + Directory + Ledger + Indexers)
 
-Este documento resume la infraestructura y el flow P2P que tenemos montado para `poker44`:
+Este documento resume la infraestructura P2P que tenemos montada para `poker44` y como se conectan:
 
-- Una **subnet de Bittensor** con `validator` y `miner` (synapse).
-- Una **plataforma de poker** (backend Node + Postgres + Redis + frontend Next.js) que corre **por validator**.
-- Un **Room Directory** (servicio ligero) para descubrir rooms activos (uno por validator).
+- **Bittensor subnet** con `validator` y `miners` (synapse).
+- **Poker Platform** (backend Node + Postgres + Redis + frontend Next.js).
+- **Room Directory** (central) para descubrir mesas activas por validator.
+- **Indexer** por validator (read API) que publica *attestation bundle* y computa estado de attestation (mock).
+- **Ledger/Auth/Balance** (central) que es el *source-of-truth* de identidad y chips (simulado) y que **verifica attestation** antes de aceptar buy-in/cash-out.
 
-La idea es que los **validators generan manos nuevas** (humanos vs bots), las usan para evaluar a los **miners** (modelos anti-bot) y hacen `set_weights` en cadena.
-Los humanos **no ven** nada de Bittensor/validators: solo ven una plataforma de poker normal con balance y mesa.
+Objetivo MVP: que un usuario humano vea una plataforma de poker normal (balance + lobby + mesa), mientras que cada validator genera manos nuevas (humanos vs bots) para evaluar a miners y hacer `set_weights` en la red.
 
-## Repos / Layout local (workspace)
+## Layout local (workspace)
 
 - Subnet: `poker44-subnet/`
   - Neurons: `poker44-subnet/neurons/`
   - Lógica subnet: `poker44-subnet/poker44/`
+  - P2P services/lib: `poker44-subnet/poker44/p2p/`
   - Deploy PM2: `poker44-subnet/scripts/deploy/pm2/`
   - Docs: `poker44-subnet/docs/`
 - Platform:
@@ -22,215 +24,187 @@ Los humanos **no ven** nada de Bittensor/validators: solo ven una plataforma de 
 
 ## Componentes (qué corre y para qué)
 
-### 1) Room Directory (común)
+### 1) Room Directory (central)
 
-Servicio FastAPI (in-memory) para listar rooms activos:
+Servicio FastAPI (in-memory) para registrar validators y listar rooms activos:
 
 - Código: `poker44-subnet/poker44/p2p/room_directory/app.py`
 - Endpoints:
-  - `POST /announce` (anuncio firmado por el validator)
-  - `GET /rooms` (listado de rooms activos)
+  - `POST /announce`
+  - `GET /rooms`
   - `GET /healthz`
 - Seguridad (MVP):
-  - Firma **HMAC** con `DIRECTORY_SHARED_SECRET` (placeholder; futuro: firma hotkey/ed25519).
-- TTL:
-  - `DIRECTORY_TTL_SECONDS` (default 60s). Si el validator deja de anunciar, desaparece del directorio.
-- CORS:
-  - Habilitado para que el **frontend** pueda hacer `fetch` al directory sin “Failed to fetch”.
+  - `signature` es HMAC con `DIRECTORY_SHARED_SECRET` (placeholder; futuro: firma hotkey/ed25519).
+- Datos anunciados mínimos:
+  - `validator_id`, `validator_name`
+  - `platform_url` (backend del validator donde se juega)
+  - `indexer_url` (read API del validator)
+  - `room_code` (mesa pública joinable en ese momento)
+  - `last_seen`, `capacity_tables`, `version_hash`, etc.
 
-### 2) Platform Backend (por validator)
+### 2) Indexer (por validator)
 
-Backend Node/Express + TypeORM, con dependencias en Docker:
+Servicio FastAPI que corre junto a cada validator para publicar "attestation mock" y un estado de directory verificable:
 
-- Postgres + Redis via `platform/backend/docker-compose.yml`
-- API pública (para humanos) bajo `/api/v1/*`:
-  - Auth: `/api/v1/auth/*` (cookie HTTP-only `auth_token`)
+- Código: `poker44-subnet/poker44/p2p/indexer/app.py`
+- Endpoints:
+  - `GET /attestation/bundle` (firmado por hotkey del validator)
+  - `GET /attestation/votes` (votos sobre otros validators para el epoch actual)
+  - `GET /directory/state` (agrega `/rooms` + votos y calcula `attested`)
+  - `GET /attestation/status/{validator_id}` (status puntual para el ledger/front)
+- Mock TEE:
+  - `tee_enabled` se configura con `INDEXER_TEE_ENABLED=true|false`.
+  - En este MVP no hay TEE real, pero la infra para verificar y bloquear ya existe.
+
+Esto permite simular un validator "dangerous":
+
+- Si `tee_enabled=false`, el indexer de cualquier peer lo marca `attested=false` y `danger_reason=tee_disabled`.
+
+### 3) Ledger/Auth/Balance (central)
+
+Es una instancia del **mismo backend** `platform/backend`, pero corriendo en "modo ledger":
+
+- Es el único sitio donde vive el bankroll simulado (`balanceChips`) y la identidad.
+- Endpoints:
+  - Auth: `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, etc.
+  - Ledger: `GET /api/v1/ledger/me`, `POST /api/v1/ledger/buyin`, `POST /api/v1/ledger/cashout`
+- Verificación de attestation (MVP):
+  - El ledger lista indexers desde el Room Directory (`LEDGER_DIRECTORY_URL`).
+  - Para un `validatorId` dado, consulta `GET {indexer}/attestation/status/{validatorId}`.
+  - Rechaza si:
+    - Cualquier indexer reporta `attested=false` o `tee_enabled=false`.
+    - No hay suficientes indexers disponibles (`LEDGER_MIN_INDEXERS`, default 2).
+- Auth (P2P):
+  - `AUTH_RETURN_TOKEN_IN_BODY=true` para devolver `{ user, token }`.
+  - `AUTH_SET_COOKIE=false` para no usar cookies cross-domain.
+  - El frontend guarda el token en `localStorage` y usa `Authorization: Bearer <token>`.
+
+### 4) Platform Backend (por validator)
+
+Cada validator corre su **propio backend** (Node/Express) con su **propio Postgres + Redis**:
+
+- API pública (para jugar) bajo `/api/v1/*`:
   - Rooms: `/api/v1/rooms/*`
-  - Game: sockets + endpoints del motor
-- Endpoints internos (solo validator, protegidos por secreto):
-  - `POST /internal/rooms/ensure` crea/reusa el **room anunciado** por ese validator y sienta bots.
-  - `POST /internal/rooms/:code/start` intenta arrancar el juego (solo cuando hay al menos 1 humano conectado).
-  - `GET /internal/eval/next?limit=N&requireMixed=true` devuelve batches **consume-once** de manos ya jugadas (fresh, nunca evaluadas antes).
-  - `POST /internal/eval/simulate` genera manos de prueba (dev) si no hay humanos jugando.
+  - Juego: socket.io + endpoints del motor
+  - Admin dashboard: `/api/v1/admin/*` (solo admins)
+- Internal endpoints (solo validator local, protegidos por secreto):
+  - `POST /internal/rooms/ensure` (crea/reusa la mesa pública)
+  - `POST /internal/rooms/:code/start` (arranca la mesa si hay 1 HUMANO conectado)
+  - `GET /internal/eval/next?limit=N&requireMixed=true` (hands fresh consume-once)
+  - `POST /internal/eval/simulate` (dev autosimulate si no hay manos)
+  - `POST /internal/metrics/ingest-cycle` (ingesta de resultados de evaluación para dashboard)
   - Header requerido: `x-eval-secret: <INTERNAL_EVAL_SECRET>`
 
-Bots en mesas P2P:
+**Bots en mesas públicas**
 
-- El “host” del room anunciado es un **BOT** interno.
-- Se crean bots extra (default 3 total contando host) y se unen al room.
-- Los bots no tienen “marca” visible: usernames tipo `player_<hash>_<idx>`.
-- El juego **no arranca** hasta que hay al menos 1 HUMANO conectado (evita que bots arranquen y bloqueen la entrada).
-- Cuando arranca: `botAutoplay: true` (bots actúan server-side) y `autoRebuy: true` (cash-game feel).
+- El room público anunciado se hostea por un BOT interno.
+- Se sientan bots extra (`P2P_ROOM_BOT_COUNT`, default 3 incluyendo host bot).
+- El juego no arranca hasta que hay al menos 1 HUMANO conectado.
+- Al arrancar: `botAutoplay=true` y `autoRebuy=true`.
 
-Datos de evaluación:
+**Ledger bridge (buy-in/cash-out)**
 
-- El backend registra eventos por mano en DB (`game_events`, `hand_results`, etc).
-- `internal/eval/next` construye un objeto “hand” **sanitizado** (sin hole cards), con:
-  - secuencia de eventos, fase, amounts, pot/current_bet, stacks, `decision_ms`, etc.
-  - IDs anonimizados por tokens (hand/table/seat tokens).
-- Consume-once:
-  - Tabla `eval_consumed_hands` asegura que una mano se evalúa una sola vez.
+Cuando `LEDGER_API_URL` está configurado en el backend del validator:
 
-Auth / “token en storage”:
+- `POST /api/v1/rooms/:code/join` hace `ledger.buyin` (deduce `startingChips`) antes de unirse.
+- `POST /api/v1/rooms/:code/leave` hace `ledger.cashout` (devuelve `startingChips`) antes de salir.
+- Si el validator no está attested, el ledger devuelve 403 y el join falla.
 
-- El frontend **no guarda token en localStorage** (es inseguro).
-- La sesión se mantiene con cookie **HTTP-only** `auth_token` (persistente).
-- En dev hemos extendido la duración de sesión a 30 días (`JWT_EXPIRES_IN=30d`, `COOKIE_MAX_AGE=2592000000`).
+### 5) Platform Frontend (central)
 
-### 3) Platform Frontend (por validator)
+Frontend Next.js que vive fuera de validators y se conecta dinámicamente al backend elegido:
 
-Frontend Next.js (poker UI) en modo P2P:
+- Home: `/poker-gameplay` (login/signup)
+- Lobby: `/poker-gameplay/lobby` (lista mesas públicas del directory + tablas privadas)
+- P2P debug: `/poker-gameplay/p2p` (config manual de directory/validator)
 
-- Entry: `/poker-gameplay`
-- Flow “poker normal”:
-  1. Abres `/poker-gameplay`
-  2. El cliente **auto-selecciona** un backend/room desde el Room Directory (sin mostrarlo al usuario)
-  3. Login/Signup normal
-  4. “Play Now” te manda al room (mesa)
-- La selección P2P se guarda en `localStorage` (NO tokens):
-  - `poker44_platform_url`, `poker44_api_base_url`, `poker44_ws_url`, `poker44_directory_url`, `poker44_pending_room_code`
-- El usuario no necesita abrir `/poker-gameplay/p2p` (queda como página debug, sin link).
+P2P selection:
 
-### 4) Miner (Bittensor)
+- Auto-selección best-effort vía `Room Directory` (`NEXT_PUBLIC_DIRECTORY_URL`).
+- Cross-check best-effort con 2 indexers (si están disponibles) para marcar rooms `Verified/Unverified`.
+- Guarda en `localStorage` solo URLs/room_code (no secretos):
+  - `poker44_platform_url`, `poker44_api_base_url`, `poker44_ws_url`, `poker44_directory_url`.
+- Auth token:
+  - Se guarda en `localStorage` (MVP) y se manda como `Authorization: Bearer` a validators y al ledger.
 
-Neuron miner que expone un axon y responde a la synapse:
+### 6) Miner (Bittensor)
+
+Neuron miner que responde a la synapse:
 
 - Código: `poker44-subnet/neurons/miner.py`
 - Synapse: `poker44-subnet/poker44/validator/synapse.py` (`DetectionSynapse`)
 - Input: `chunks` (lista de N chunks; cada chunk es lista de dicts “hand”)
 - Output: `risk_scores` (lista de floats, 1 score por chunk)
-- En dev/testnet el miner actual es un **modelo mock** que devuelve scores aleatorios (suficiente para E2E).
 
-### 5) Validator (Bittensor) + P2P bridge
+En dev/testnet usamos un miner mock (scores aleatorios) para poder probar E2E.
+
+### 7) Validator (Bittensor) + evaluación
 
 Neuron validator que:
 
-- Asegura un room discoverable y lo anuncia al directory.
-- Genera “tareas” de evaluación desde el Platform Backend (`/internal/eval/next`).
-- Acumula hasta N tasks (chunks) y consulta a los miners.
-- Calcula rewards y hace `set_weights` (con commit-reveal timelocked en testnet netuid 401).
+- Mantiene una mesa pública joinable y la anuncia al directory.
+- Consume manos nuevas desde su platform backend (`/internal/eval/next`) y acumula hasta N.
+- Consulta a miners con `DetectionSynapse`.
+- Calcula rewards y hace `set_weights` en cadena.
+- Publica métricas al backend local (`/internal/metrics/ingest-cycle`) para dashboard.
 
-Piezas clave:
+Entrypoints:
 
-- Entrypoint: `poker44-subnet/neurons/validator.py`
-- Ciclo de forward: `poker44-subnet/poker44/validator/forward.py`
-  - Buffer: acumula hasta `POKER44_TASK_BATCH_SIZE` (default 10) y luego evalúa exactamente esas N.
-  - Autosimulate (dev): si no hay batches y `POKER44_AUTOSIMULATE=true`, llama `/internal/eval/simulate`.
-- P2P announcement loop:
-  - Asegura room via `/internal/rooms/ensure`
-  - Intenta arrancar room via `/internal/rooms/:code/start`
-  - Anuncia via directory `/announce` con firma HMAC
+- `poker44-subnet/neurons/validator.py`
+- `poker44-subnet/poker44/validator/forward.py`
 
-Weights en testnet (netuid 401):
+Buffering:
 
-- `commit_reveal_weights_enabled=True` (CRv4 timelocked), por lo que:
-  - `set_weights` crea **un commit** y el reveal ocurre mas tarde (no se ve inmediato en `metagraph.weights`).
-  - Para verificar: `sub.get_timelocked_weight_commits(netuid)`.
-- El validator respeta `weights_rate_limit` del chain para no spamear `set_weights`.
+- `POKER44_TASK_BATCH_SIZE` (default 10): acumula hasta N y evalúa exactamente esas N; luego espera otras N.
 
-## Deploy local (PM2) y URLs
+Selección de miners:
 
-Script que levanta TODO en local (con puertos dinamicos):
+- Por defecto filtra peers no-serving para evitar ruido (validators con `axon_off`, uids stale, etc.).
+- Overrides:
+  - `POKER44_QUERY_UIDS="1,3,4"`
+  - `POKER44_QUERY_HOTKEYS="<ss58>,<ss58>"`
 
-- Up: `poker44-subnet/scripts/deploy/pm2/up.sh`
-- Down: `poker44-subnet/scripts/deploy/pm2/down.sh`
+## Deploy local E2E (2 validators + ledger + directory + frontend + 3 miners)
 
-`up.sh` hace:
+Script recomendado:
 
-- Selecciona puertos libres (frontend/backend/directory + base para axons de miners).
-- Levanta Docker deps del backend (`npm run docker:up` + migrations).
-- Arranca en PM2:
-  - directory
-  - platform backend
-  - platform frontend
-  - miner(s)
-  - validator
-- Escribe runtime en `poker44-subnet/.p2p_deploy.env` (gitignored).
+```bash
+cd poker44-subnet
+NETWORK=test NETUID=401 \
+VALIDATOR_WALLET=poker44-test VALIDATOR1_HOTKEY=validator VALIDATOR2_HOTKEY=validator2 \
+MINER_WALLET=owner MINER_HOTKEYS=miner1,miner2,miner3 \
+START_PORT=random \
+bash scripts/deploy/pm2/up-e2e-2validators.sh
+```
 
-Para ver el estado:
+Qué levanta:
 
-- `pm2 ls | rg poker44-p2p`
-- `pm2 logs poker44-p2p-validator-test-default --lines 200`
-- `pm2 logs poker44-p2p-miner-test-miner1 --lines 200`
+- Central: directory + frontend + ledger
+- Miners: 3 procesos (axon ports consecutivos)
+- Validator 1: `INDEXER_TEE_ENABLED=true` (attested)
+- Validator 2: `INDEXER_TEE_ENABLED=false` (dangerous, ledger lo deniega)
 
-## Deploy modular (desacoplado)
+Verificación rápida:
 
-Topologia objetivo:
+- Directory rooms: `GET <directory>/rooms`
+- Indexer state: `GET <indexer>/directory/state` (deberías ver `danger_reason=tee_disabled` en validator2)
+- Ledger denial:
+  - `POST <ledger>/api/v1/ledger/buyin` con `validatorId` del validator2 -> 403
+- Frontend: abre `http://127.0.0.1:<frontend_port>/poker-gameplay`
+  - Login: `test@poker44.com` / `password`
 
-- **Central** (infra comun): `room_directory` + `platform frontend`
-- **Por validator** (infra del operador): `platform backend` + `validator` (+ su Postgres/Redis)
-- **Por miner** (infra del operador): `miner`
+## Tests
 
-Scripts PM2 (MVP):
-
-- Central:
-  - `bash poker44-subnet/scripts/deploy/pm2/up-directory.sh` (solo directory)
-  - `bash poker44-subnet/scripts/deploy/pm2/up-central.sh` (directory + frontend)
-- Validator operator:
-  - `bash poker44-subnet/scripts/deploy/pm2/up-validator-stack.sh` (backend + validator)
-
-Variables importantes en modo desacoplado:
-
-- El directory es un servicio HTTP publico:
-  - `DIRECTORY_SHARED_SECRET` debe coincidir con el validator.
-- El validator debe anunciar un `platform_url` reachable por usuarios (no `127.0.0.1`):
-  - setea `POKER44_PLATFORM_PUBLIC_URL=https://<tu-dominio-o-ip>:<port>`
-- El backend debe permitir CORS + cookies desde el frontend:
-  - `CORS_ORIGINS=https://<frontend-domain>`
-  - En prod: `COOKIE_DOMAIN=.poker44.com` + HTTPS (SameSite=None, Secure)
-
-## Smoke / tests
-
-- Smoke (stack P2P + internal endpoints + directory):
-  - `poker44-subnet/scripts/testnet/smoke_validator_stack.sh`
-- Tests subnet:
+- Subnet:
   - `cd poker44-subnet && ./validator_env/bin/python -m pytest -q`
-- Tests backend:
+- Backend:
   - `cd platform/backend && npm test`
-- Typecheck frontend:
-  - `cd platform/frontend && npm run typecheck`
+- Frontend:
+  - `cd platform/frontend && npm test && npm run lint && npm run typecheck`
 
-## Variables de entorno importantes (resumen)
+## Notas / TODOs (intencionales por MVP)
 
-Directory:
-
-- `DIRECTORY_SHARED_SECRET`
-- `DIRECTORY_TTL_SECONDS`
-- `DIRECTORY_CORS_ORIGINS`
-
-Platform backend:
-
-- `PORT`
-- `CORS_ORIGINS`
-- `INTERNAL_EVAL_SECRET`
-- `JWT_EXPIRES_IN` (dev: 30d)
-- `COOKIE_MAX_AGE` (dev: 2592000000)
-
-Validator (P2P provider):
-
-- `POKER44_PROVIDER=platform`
-- `POKER44_PLATFORM_BACKEND_URL=http://127.0.0.1:<backend_port>`
-- `POKER44_INTERNAL_EVAL_SECRET=<secret>`
-- `POKER44_DIRECTORY_URL=http://127.0.0.1:<directory_port>`
-- `POKER44_DIRECTORY_SHARED_SECRET=<secret>`
-- `POKER44_AUTOSIMULATE=true|false`
-- `POKER44_TASK_BATCH_SIZE=10`
-- `POKER44_QUERY_HOTKEYS=<comma-separated ss58>` (para limitar miners consultados)
-
-Frontend:
-
-- `NEXT_PUBLIC_API_URL=<platform_url>/api/v1`
-- `NEXT_PUBLIC_WS_URL=<platform_url>`
-- `NEXT_PUBLIC_DIRECTORY_URL=<directory_url>`
-
-## Qué estamos haciendo (en una frase)
-
-Estamos construyendo una plataforma de poker P2P donde **cada validator corre su propia sala** y usa manos nuevas (humanos vs bots) para evaluar modelos anti-bot (miners) en Bittensor, estableciendo weights en cadena, mientras los humanos juegan en una UI normal sin saber nada de validators/miners.
-
-## Limitaciones / TODOs (intencionales por MVP)
-
-- Directory usa HMAC compartido (reemplazar por firma hotkey/ed25519).
-- Selection P2P en frontend: ahora es “auto-pick primero”; mas adelante: balancear por region/capacity/latency.
-- Commit-reveal timelocked: las weights no aparecen instantaneamente; hay que esperar reveal.
-- Scoring miner: actualmente es baseline/mock (mejorar scoring y anti-collusion).
-- Reward “burn UID0”: fixed para que el burn vaya al UID 0 global (no al indice 0 del subset consultado).
+- Attestation es mock (no TEE real, no IPFS, no anclaje on-chain de commitments).
+- Token en `localStorage` es un tradeoff para evitar cookies cross-domain en MVP.
+- Join mid-game no está soportado: las mesas públicas rotan a un nuevo `room_code` cuando arrancan.
+- Scoring es baseline; anti-collusion y scoring robusto vendrá después.
