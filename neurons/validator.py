@@ -424,6 +424,10 @@ class Validator(BaseValidatorNeuron):
         def _parse_ts(s: str) -> Optional[int]:
             try:
                 dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    # Platform backend stores timestamps as "timestamp without time zone".
+                    # We treat these as UTC to keep since_ms monotonic across machines.
+                    dt = dt.replace(tzinfo=datetime.timezone.utc)
                 return int(dt.timestamp() * 1000)
             except Exception:
                 return None
