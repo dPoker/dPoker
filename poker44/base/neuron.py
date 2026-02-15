@@ -194,10 +194,22 @@ class BaseNeuron(ABC):
         if self.config.neuron.disable_set_weights:
             return False
 
-        # Define appropriate logic for when set weights.
-        return (
-            self.block - self.metagraph.last_update[self.uid]
-        ) > self.config.neuron.epoch_length and self.neuron_type != "MinerNeuron"  # don't set weights if you're a miner
+        # Never set weights if you're a miner.
+        if self.neuron_type == "MinerNeuron":
+            return False
+
+        # Public networks enforce a dedicated weight rate-limit which can be
+        # larger than our local epoch_length. Respect it to avoid "too soon"
+        # failures and noisy logs.
+        limit = int(self.config.neuron.epoch_length)
+        try:
+            wrl = getattr(self.subtensor, "weights_rate_limit", None)
+            if callable(wrl):
+                limit = max(limit, int(wrl(self.config.netuid)))
+        except Exception:
+            pass
+
+        return (self.block - self.metagraph.last_update[self.uid]) > limit
 
     def save_state(self):
         bt.logging.trace(
