@@ -271,8 +271,15 @@ async def _run_forward_cycle(validator) -> None:
                         response_time_ms = float(pt) * 1000.0
                     except Exception:
                         response_time_ms = None
+
+            rt_ms_int = None
+            if response_time_ms is not None:
+                try:
+                    rt_ms_int = int(round(float(response_time_ms)))
+                except Exception:
+                    rt_ms_int = None
             resp_meta_by_uid[uid] = {
-                "response_time_ms": None if response_time_ms is None else float(response_time_ms),
+                "response_time_ms": rt_ms_int,
                 "status_code": None if status_code is None else int(status_code),
             }
         except Exception:
