@@ -63,7 +63,8 @@ def _get_metagraph(*, ttl_s: int = 30) -> Optional[Any]:
         ):
             return _METAGRAPH_CACHE.get("mg")
 
-        subtensor = bt.subtensor(network=network)
+        # Bittensor SDK changed around v10: `bt.subtensor()` was replaced by `bt.Subtensor`.
+        subtensor = bt.subtensor(network=network) if hasattr(bt, "subtensor") else bt.Subtensor(network=network)
         mg = subtensor.metagraph(netuid=netuid)
         _METAGRAPH_CACHE.update({"ts": now, "network": network, "netuid": int(netuid), "mg": mg})
         return mg
