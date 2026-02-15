@@ -59,6 +59,7 @@ Servicio FastAPI que corre junto a cada validator para publicar "attestation moc
 Esto permite simular un validator "dangerous":
 
 - Si `tee_enabled=false`, el indexer de cualquier peer lo marca `attested=false` y `danger_reason=tee_disabled`.
+- Si el validator **no publica bundle** (`INDEXER_DISABLE_BUNDLE=true`), los peers lo marcan `attested=false` y `danger_reason=missing_or_invalid_bundle` (equivale a "no está usando attestation").
 
 ### 3) Ledger/Auth/Balance (central)
 
@@ -183,6 +184,13 @@ Qué levanta:
 - Miners: 3 procesos (axon ports consecutivos)
 - Validator 1: `INDEXER_TEE_ENABLED=true` (attested)
 - Validator 2: `INDEXER_TEE_ENABLED=false` (dangerous, ledger lo deniega)
+
+Opcional (para pruebas de seguridad):
+
+- Mock "no attestation" en validator2:
+  - `INDEXER_DISABLE_BUNDLE_VALI2=true`
+- Mock "no TEE" en validator1:
+  - `INDEXER_TEE_ENABLED_VALI1=false`
 
 Verificación rápida:
 
