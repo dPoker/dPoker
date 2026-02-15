@@ -45,6 +45,11 @@ class ValidatorStatus(BaseModel):
 
     last_seen: int = 0
 
+    # Metagraph-derived info (best-effort).
+    uid: Optional[int] = None
+    stake_tao: Optional[float] = None
+    validator_permit: Optional[bool] = None
+
     # Attestation-derived status.
     tee_enabled: Optional[bool] = None
     votes_pass: int = 0
@@ -63,4 +68,3 @@ class DirectoryState(BaseModel):
 
     # Small debug surface for clients.
     meta: Dict[str, str] = Field(default_factory=dict)
-

@@ -189,13 +189,16 @@ JWT_EXPIRES_IN="${JWT_EXPIRES_IN:-30d}" \
 COOKIE_MAX_AGE="${COOKIE_MAX_AGE:-2592000000}" \
 AUTH_RETURN_TOKEN_IN_BODY="true" \
 AUTH_SET_COOKIE="false" \
-LEDGER_DIRECTORY_URL="$directory_url" \
-LEDGER_MIN_INDEXERS="${LEDGER_MIN_INDEXERS:-2}" \
-pm2 start npm \
-  --name "$backend_name" \
-  --cwd "$platform_backend_dir" \
-  -- \
-  run dev
+	LEDGER_DIRECTORY_URL="$directory_url" \
+	LEDGER_MIN_INDEXERS="${LEDGER_MIN_INDEXERS:-2}" \
+	LEDGER_MIN_VALIDATOR_STAKE="${LEDGER_MIN_VALIDATOR_STAKE:-0}" \
+	LEDGER_VALIDATOR_BLACKLIST="${LEDGER_VALIDATOR_BLACKLIST:-}" \
+	SETTLEMENT_API_ENABLED="${SETTLEMENT_API_ENABLED:-true}" \
+	pm2 start npm \
+	  --name "$backend_name" \
+	  --cwd "$platform_backend_dir" \
+	  -- \
+	  run dev
 
 log "Waiting for ledger health"
 wait_http "http://127.0.0.1:${ledger_port}/health/live" 90

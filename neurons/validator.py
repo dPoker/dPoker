@@ -24,6 +24,8 @@ import os
 import random
 import threading
 import time
+import json
+import datetime
 from typing import Optional, List, Dict, Any
 
 import bittensor as bt
@@ -256,6 +258,7 @@ class Validator(BaseValidatorNeuron):
 
         # Optional P2P room directory announcements (MVP: shared-secret HMAC).
         self._start_p2p_announcer(provider_mode)
+        self._start_receipts_forwarder(provider_mode)
 
     def _ensure_room_code(self, *, platform_url: str, secret: str, validator_id: str) -> Optional[str]:
         if not platform_url or not secret:
@@ -373,6 +376,120 @@ class Validator(BaseValidatorNeuron):
                 except Exception as e:
                     bt.logging.warning(f"[p2p] announce failed: {e}")
                 time.sleep(max(1, announce_interval_s))
+
+        threading.Thread(target=_loop, daemon=True).start()
+
+    def _start_receipts_forwarder(self, provider_mode: str) -> None:
+        """
+        Best-effort: forward signed hand receipts to the central ledger for settlement/audit.
+
+        This runs alongside the validator and uses the validator hotkey to sign each receipt.
+        """
+        enabled = (os.getenv("POKER44_RECEIPTS_ENABLED") or "false").strip().lower() in ("1", "true", "yes", "y", "on")
+        if not enabled:
+            return
+        if provider_mode != "platform":
+            return
+
+        ledger_api = (os.getenv("POKER44_LEDGER_API_URL") or "").strip().rstrip("/")
+        platform_url = (os.getenv("POKER44_PLATFORM_BACKEND_URL") or "").strip().rstrip("/")
+        secret = (os.getenv("POKER44_INTERNAL_EVAL_SECRET") or "").strip()
+        if not ledger_api or not platform_url or not secret:
+            return
+
+        poll_s = 3.0
+        try:
+            poll_s = float(os.getenv("POKER44_RECEIPTS_POLL_S") or "3.0")
+        except Exception:
+            poll_s = 3.0
+        poll_s = max(0.5, min(60.0, poll_s))
+
+        limit = 100
+        try:
+            limit = int(os.getenv("POKER44_RECEIPTS_LIMIT") or "100")
+        except Exception:
+            limit = 100
+        limit = max(1, min(500, limit))
+
+        validator_id = (os.getenv("POKER44_VALIDATOR_ID") or "").strip() or self.wallet.hotkey.ss58_address
+        keypair = self.wallet.hotkey
+
+        def _canon(obj: Dict[str, Any]) -> bytes:
+            # Must match backend canonicalization (stable keys, no spaces, ASCII escaped).
+            return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+
+        def _sign(payload: Dict[str, Any]) -> str:
+            return keypair.sign(_canon(payload)).hex()
+
+        def _parse_ts(s: str) -> Optional[int]:
+            try:
+                dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+                return int(dt.timestamp() * 1000)
+            except Exception:
+                return None
+
+        def _loop() -> None:
+            since_ms: int = 0
+            while True:
+                try:
+                    params: Dict[str, Any] = {"limit": int(limit)}
+                    if since_ms > 0:
+                        params["since"] = str(since_ms)
+                    r = requests.get(
+                        f"{platform_url}/internal/receipts/hands",
+                        params=params,
+                        headers={"x-eval-secret": secret},
+                        timeout=10.0,
+                    )
+                    r.raise_for_status()
+                    data = r.json() if r.content else {}
+                    receipts = []
+                    if isinstance(data, dict) and data.get("success") and isinstance(data.get("data"), dict):
+                        receipts = data["data"].get("receipts") or []
+                    if not isinstance(receipts, list) or not receipts:
+                        time.sleep(poll_s)
+                        continue
+
+                    signed = []
+                    max_ended = since_ms
+                    now_s = int(time.time())
+                    for rec in receipts:
+                        if not isinstance(rec, dict):
+                            continue
+                        # Attach signer timestamp and signature.
+                        payload = dict(rec)
+                        payload["validator_id"] = validator_id
+                        payload["timestamp"] = now_s
+                        sig_payload = dict(payload)
+                        sig_payload.pop("signature", None)
+                        signature = _sign(sig_payload)
+                        payload["signature"] = signature
+                        signed.append(payload)
+
+                        ended_at = payload.get("ended_at")
+                        if isinstance(ended_at, str):
+                            ts = _parse_ts(ended_at)
+                            if ts is not None:
+                                max_ended = max(max_ended, ts + 1)
+
+                    if not signed:
+                        time.sleep(poll_s)
+                        continue
+
+                    # Send to ledger settlement endpoint.
+                    post = requests.post(
+                        f"{ledger_api}/settlement/hand-receipts",
+                        headers={"content-type": "application/json"},
+                        json={"receipts": signed},
+                        timeout=10.0,
+                    )
+                    post.raise_for_status()
+                    resp = post.json() if post.content else {}
+                    bt.logging.info(f"[receipts] forwarded {len(signed)} receipts to ledger. resp={resp}")
+                    since_ms = max_ended
+                except Exception as e:
+                    bt.logging.warning(f"[receipts] forward failed: {e}")
+                time.sleep(poll_s)
 
         threading.Thread(target=_loop, daemon=True).start()
 

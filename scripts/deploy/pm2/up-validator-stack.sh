@@ -282,16 +282,18 @@ indexer_name="${pm2_prefix}-indexer"
 log "Starting validator indexer (PM2: $indexer_name)"
 pm2_delete_if_exists "$indexer_name"
 
-INDEXER_WALLET_NAME="$validator_wallet" \
-INDEXER_WALLET_HOTKEY="$validator_hotkey" \
-INDEXER_VALIDATOR_NAME="$validator_friendly_name" \
-INDEXER_TEE_ENABLED="$indexer_tee_enabled" \
-INDEXER_DISABLE_BUNDLE="$indexer_disable_bundle" \
-INDEXER_DIRECTORY_URL="$directory_url" \
-pm2 start "$venv_dir/bin/python" \
-  --name "$indexer_name" \
-  --cwd "$repo_dir" \
-  -- \
+	INDEXER_WALLET_NAME="$validator_wallet" \
+	INDEXER_WALLET_HOTKEY="$validator_hotkey" \
+	INDEXER_VALIDATOR_NAME="$validator_friendly_name" \
+	INDEXER_TEE_ENABLED="$indexer_tee_enabled" \
+	INDEXER_DISABLE_BUNDLE="$indexer_disable_bundle" \
+	INDEXER_DIRECTORY_URL="$directory_url" \
+	INDEXER_SUBTENSOR_NETWORK="$network" \
+	INDEXER_NETUID="$netuid" \
+	pm2 start "$venv_dir/bin/python" \
+	  --name "$indexer_name" \
+	  --cwd "$repo_dir" \
+	  -- \
   -m uvicorn poker44.p2p.indexer.app:app \
   --host 0.0.0.0 --port "$indexer_port"
 
@@ -308,15 +310,17 @@ POKER44_PROVIDER="platform" \
 POKER44_PLATFORM_BACKEND_URL="$platform_base_url" \
 POKER44_PLATFORM_PUBLIC_URL="$platform_public_url" \
 POKER44_INDEXER_PUBLIC_URL="$indexer_public_url" \
-POKER44_INTERNAL_EVAL_SECRET="$internal_eval_secret" \
-POKER44_DIRECTORY_URL="$directory_url" \
-POKER44_DIRECTORY_SHARED_SECRET="$directory_secret" \
-POKER44_ANNOUNCE_INTERVAL_S="${POKER44_ANNOUNCE_INTERVAL_S:-10}" \
-POKER44_AUTOSIMULATE="${POKER44_AUTOSIMULATE:-false}" \
-POKER44_TASK_BATCH_SIZE="${POKER44_TASK_BATCH_SIZE:-10}" \
-POKER44_VALIDATOR_ID="${POKER44_VALIDATOR_ID:-$validator_ss58}" \
-POKER44_VALIDATOR_NAME="$validator_friendly_name" \
-pm2 start "$venv_dir/bin/python" \
+	POKER44_INTERNAL_EVAL_SECRET="$internal_eval_secret" \
+	POKER44_DIRECTORY_URL="$directory_url" \
+	POKER44_DIRECTORY_SHARED_SECRET="$directory_secret" \
+	POKER44_LEDGER_API_URL="$ledger_api_url" \
+	POKER44_RECEIPTS_ENABLED="${POKER44_RECEIPTS_ENABLED:-true}" \
+	POKER44_ANNOUNCE_INTERVAL_S="${POKER44_ANNOUNCE_INTERVAL_S:-10}" \
+	POKER44_AUTOSIMULATE="${POKER44_AUTOSIMULATE:-false}" \
+	POKER44_TASK_BATCH_SIZE="${POKER44_TASK_BATCH_SIZE:-10}" \
+	POKER44_VALIDATOR_ID="${POKER44_VALIDATOR_ID:-$validator_ss58}" \
+	POKER44_VALIDATOR_NAME="$validator_friendly_name" \
+	pm2 start "$venv_dir/bin/python" \
   --name "$validator_name" \
   --cwd "$repo_dir" \
   -- \

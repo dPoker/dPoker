@@ -38,6 +38,62 @@ def _epoch(now_ts: int, epoch_seconds: int) -> int:
     s = max(5, int(epoch_seconds))
     return int(now_ts // s)
 
+_METAGRAPH_CACHE: Dict[str, Any] = {"ts": 0.0, "network": "", "netuid": 0, "mg": None}
+
+
+def _metagraph_config() -> Tuple[str, int]:
+    network = (os.getenv("INDEXER_SUBTENSOR_NETWORK") or os.getenv("SUBTENSOR_NETWORK") or "").strip()
+    if not network:
+        network = "test"
+    netuid = _int_env("INDEXER_NETUID", _int_env("NETUID", 0))
+    return network, int(netuid)
+
+
+def _get_metagraph(*, ttl_s: int = 30) -> Optional[Any]:
+    try:
+        network, netuid = _metagraph_config()
+        if netuid <= 0:
+            return None
+        now = time.time()
+        if (
+            _METAGRAPH_CACHE.get("mg") is not None
+            and _METAGRAPH_CACHE.get("network") == network
+            and int(_METAGRAPH_CACHE.get("netuid") or 0) == int(netuid)
+            and (now - float(_METAGRAPH_CACHE.get("ts") or 0.0)) <= float(ttl_s)
+        ):
+            return _METAGRAPH_CACHE.get("mg")
+
+        subtensor = bt.subtensor(network=network)
+        mg = subtensor.metagraph(netuid=netuid)
+        _METAGRAPH_CACHE.update({"ts": now, "network": network, "netuid": int(netuid), "mg": mg})
+        return mg
+    except Exception:
+        return None
+
+
+def _metagraph_row(hotkey: str) -> Tuple[Optional[int], Optional[float], Optional[bool]]:
+    mg = _get_metagraph()
+    if mg is None:
+        return None, None, None
+    try:
+        uid = mg.hotkeys.index(hotkey)
+    except Exception:
+        return None, None, None
+
+    stake = None
+    try:
+        stake = float(mg.S[uid])
+    except Exception:
+        stake = None
+
+    permit = None
+    try:
+        permit = bool(mg.validator_permit[uid])
+    except Exception:
+        permit = None
+
+    return int(uid), stake, permit
+
 
 def _canon_bundle_payload(d: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(d)
@@ -210,6 +266,9 @@ def _compute_directory_state(directory_url: str, *, epoch_seconds: int) -> Direc
     rooms = _list_directory_rooms(directory_url)
     warnings: List[str] = []
 
+    # Best-effort metagraph snapshot (stake/permit). Cached to avoid hammering the chain.
+    mg = _get_metagraph()
+
     # Voter set: validators with an indexer_url (from directory).
     voter_rooms = [r for r in rooms if r.indexer_url]
     voter_indexers = [r.indexer_url for r in voter_rooms if r.indexer_url]
@@ -227,6 +286,12 @@ def _compute_directory_state(directory_url: str, *, epoch_seconds: int) -> Direc
     # Build status per validator.
     statuses: List[ValidatorStatus] = []
     for r in rooms:
+        uid: Optional[int] = None
+        stake_tao: Optional[float] = None
+        permit: Optional[bool] = None
+        if mg is not None:
+            uid, stake_tao, permit = _metagraph_row(r.validator_id)
+
         votes_pass = 0
         votes_fail = 0
 
@@ -270,6 +335,9 @@ def _compute_directory_state(directory_url: str, *, epoch_seconds: int) -> Direc
                 indexer_url=r.indexer_url,
                 room_code=r.room_code,
                 last_seen=r.last_seen,
+                uid=uid,
+                stake_tao=stake_tao,
+                validator_permit=permit,
                 tee_enabled=tee_enabled,
                 votes_pass=votes_pass,
                 votes_fail=votes_fail,
