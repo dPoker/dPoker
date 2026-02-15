@@ -115,7 +115,7 @@ async def forward(validator) -> None:
     try:
         await _run_forward_cycle(validator)
     except Exception:
-        bt.logging.error("Unexpected error in forward cycle:\n%s", traceback.format_exc())
+        bt.logging.error(f"Unexpected error in forward cycle:\n{traceback.format_exc()}")
 
 
 async def _run_forward_cycle(validator) -> None:
@@ -329,20 +329,83 @@ async def _run_forward_cycle(validator) -> None:
         return
     
     rewards_array, metrics = _compute_windowed_rewards(validator, miner_uids)
-    validator.update_scores(rewards_array, miner_uids)
+
+    # ---------------------------------------------------------------------
+    # Emission burn (optional)
+    # ---------------------------------------------------------------------
+    #
+    # NOTE: `miner_uids` is a *subset* of global metagraph UIDs. If we want to
+    # burn emissions to a dedicated UID (commonly UID 0), we must target that
+    # UID on the metagraph, not the 0th index of this subset array.
+    update_uids = list(miner_uids)
+    update_rewards = rewards_array
+    metric_rewards = rewards_array
+
+    if BURN_EMISSIONS:
+        # Convert queried-miner rewards into a KEEP_FRACTION distribution.
+        if metric_rewards.size > 0:
+            total_reward = float(np.sum(metric_rewards))
+            if total_reward > 0:
+                normalized = metric_rewards / total_reward
+            else:
+                normalized = np.ones_like(metric_rewards) / float(len(metric_rewards))
+            metric_rewards = normalized.astype(np.float32) * float(KEEP_FRACTION)
+
+        # Also update the global burn UID with BURN_FRACTION (if it exists on this metagraph).
+        metagraph_n = int(
+            getattr(validator.metagraph, "n", len(getattr(validator.metagraph, "axons", [])))
+        )
+        burn_uid = int(UID_ZERO)
+        if 0 <= burn_uid < metagraph_n:
+            if burn_uid in update_uids:
+                # Edge case: burn UID is in the queried set. Allocate BURN_FRACTION
+                # to it and re-normalize KEEP_FRACTION across the remaining uids.
+                if len(update_uids) == 1:
+                    update_rewards = np.asarray([1.0], dtype=np.float32)
+                    metric_rewards = update_rewards
+                else:
+                    burn_idx = update_uids.index(burn_uid)
+                    keep_idxs = [i for i, uid in enumerate(update_uids) if uid != burn_uid]
+                    keep_raw = rewards_array[keep_idxs]
+                    keep_total = float(np.sum(keep_raw))
+                    if keep_total > 0:
+                        keep_norm = keep_raw / keep_total
+                    else:
+                        keep_norm = np.ones_like(keep_raw) / float(len(keep_raw))
+
+                    new_rewards = np.zeros_like(rewards_array, dtype=np.float32)
+                    new_rewards[keep_idxs] = keep_norm.astype(np.float32) * float(KEEP_FRACTION)
+                    new_rewards[burn_idx] = float(BURN_FRACTION)
+                    update_rewards = new_rewards
+                    metric_rewards = new_rewards
+            else:
+                update_uids.append(burn_uid)
+                update_rewards = np.concatenate(
+                    [metric_rewards, np.asarray([float(BURN_FRACTION)], dtype=np.float32)]
+                )
+
+            bt.logging.info(
+                f"95% burn applied: burn_uid={burn_uid} gets {float(BURN_FRACTION):.4f}, "
+                f"queried_miners_share={float(KEEP_FRACTION):.4f}"
+            )
+        else:
+            # Burn UID not present on metagraph; just use the queried-miner distribution.
+            update_rewards = metric_rewards
+
+    validator.update_scores(update_rewards, update_uids)
 
     # Best-effort: persist cycle metrics in the validator-local platform backend for the admin dashboard.
     await _post_cycle_metrics(
         validator=validator,
         miner_uids=miner_uids,
-        rewards_array=rewards_array,
+        rewards_array=metric_rewards,
         metrics=metrics,
         batch_count=len(chunks),
         hand_count=total_hands,
         resp_meta_by_uid=resp_meta_by_uid,
     )
 
-    bt.logging.info("Rewards issued for %d miners.", len(rewards_array))
+    bt.logging.info(f"Rewards issued for {len(miner_uids)} queried miners.")
     bt.logging.info(
         f"[Forward #{validator.forward_count}] complete. Sleeping {validator.poll_interval}s before next tick.",
     )
@@ -371,25 +434,6 @@ def _compute_windowed_rewards(validator, miner_uids: List[int]) -> tuple[np.ndar
         metrics.append(metric)
 
     rewards_array = np.asarray(rewards, dtype=np.float32)
-    
-    # **95% BURN TO UID 0**: Redistribute weights
-    if BURN_EMISSIONS:
-        if len(rewards_array) > 0:
-            # Normalize rewards to sum to 1
-            total_reward = np.sum(rewards_array)
-            if total_reward > 0:
-                normalized_rewards = rewards_array / total_reward
-            else:
-                normalized_rewards = np.ones_like(rewards_array) / len(rewards_array)
-            
-            # Allocate 95% to UID 0, 5% distributed among all miners by their performance
-            burned_rewards = normalized_rewards * KEEP_FRACTION  # Scale everyone down to 5%
-            burned_rewards[UID_ZERO] = BURN_FRACTION  # Give 95% to UID 0
-            
-            bt.logging.info(f"95% burn applied: UID 0 gets {burned_rewards[0]:.4f}, others share {1-burned_rewards[0]:.4f}")
-            
-            return burned_rewards, metrics
-    
     return rewards_array, metrics
 
 
@@ -513,5 +557,5 @@ async def _dendrite_with_retries(
             last_exc = exc
             bt.logging.warning(f"dendrite attempt {attempt}/{attempts} failed: {exc}")
             await asyncio.sleep(0.5)
-    bt.logging.error("dendrite retries exhausted: %s", last_exc)
+    bt.logging.error(f"dendrite retries exhausted: {last_exc}")
     return [None] * len(axons)
