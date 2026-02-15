@@ -205,3 +205,6 @@ prueba.dem.zst
 prueba.dem.zst:Zone.Identifier
 prueba.dem.zst
 prueba.dem.zst:Zone.Identifier
+
+# Local large dataset for validator API (do not commit)
+hands_for_validator/poker_hands_from_rar.json
