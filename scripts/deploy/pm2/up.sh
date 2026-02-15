@@ -173,6 +173,7 @@ log "  miner axon base: $miner_axon_port_base"
 deploy_env_file="$repo_dir/.p2p_deploy.env"
 cat >"$deploy_env_file" <<EOF
 START_PORT=$start_port
+PM2_PREFIX=$pm2_prefix
 FRONTEND_PORT=$frontend_port
 BACKEND_PORT=$backend_port
 DIRECTORY_PORT=$directory_port

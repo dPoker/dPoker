@@ -47,8 +47,45 @@ fi
 pm2 save >/dev/null 2>&1 || true
 
 deploy_env_file="$repo_dir/.p2p_deploy.env"
+remove_deploy_env="${REMOVE_DEPLOY_ENV:-auto}"
 if [ -f "$deploy_env_file" ]; then
-  rm -f "$deploy_env_file"
+  file_prefix="$(python3 - <<'PY' <"$deploy_env_file"
+import sys
+p = ""
+for line in sys.stdin.read().splitlines():
+  if line.startswith("PM2_PREFIX="):
+    p = line.split("=", 1)[1].strip()
+    break
+print(p)
+PY
+)"
+
+  should_remove="false"
+  case "${remove_deploy_env,,}" in
+    true)
+      should_remove="true"
+      ;;
+    false)
+      should_remove="false"
+      ;;
+    *)
+      # auto
+      if [ -n "$file_prefix" ]; then
+        if [ "$file_prefix" = "$pm2_prefix" ]; then
+          should_remove="true"
+        fi
+      else
+        # Back-compat: old files had no prefix; only remove for the default stack.
+        if [ "$pm2_prefix" = "poker44-p2p" ]; then
+          should_remove="true"
+        fi
+      fi
+      ;;
+  esac
+
+  if [ "$should_remove" = "true" ]; then
+    rm -f "$deploy_env_file"
+  fi
 fi
 
 if [ "${stop_docker,,}" = "true" ]; then
@@ -59,4 +96,3 @@ if [ "${stop_docker,,}" = "true" ]; then
 fi
 
 log "Down."
-
