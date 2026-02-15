@@ -7,6 +7,8 @@ from typing import Optional
 class ValidatorAnnounce(BaseModel):
     # Validator identity (e.g., hotkey SS58 address, or stable host ID in mock mode)
     validator_id: str
+    # Friendly name for UI/debug (does not need to be unique).
+    validator_name: str = "poker44-validator"
     # Base URL where humans connect to play poker on this validator
     platform_url: str
     # A room code that is open for discovery (optional; depends on platform UX)
@@ -23,6 +25,7 @@ class ValidatorAnnounce(BaseModel):
 
 class RoomListing(BaseModel):
     validator_id: str
+    validator_name: str = "poker44-validator"
     platform_url: str
     room_code: Optional[str] = None
     region: str
@@ -33,4 +36,3 @@ class RoomListing(BaseModel):
 
 class EnsureRoomResponse(BaseModel):
     roomCode: str = Field(alias="roomCode")
-

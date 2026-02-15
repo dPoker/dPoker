@@ -12,6 +12,7 @@ from typing import Dict, List, Sequence
 
 import bittensor as bt
 import numpy as np
+import requests
 
 from poker44.score.scoring import reward
 from poker44.validator.synapse import DetectionSynapse
@@ -239,6 +240,9 @@ async def _run_forward_cycle(validator) -> None:
     bt.logging.info(
         f"Querying {len(axons_to_query)} miners with {len(chunks)} chunks ({total_hands} total hands)..."
     )
+
+    # Collect per-miner transport metadata (best-effort; depends on bittensor version).
+    resp_meta_by_uid: Dict[int, Dict[str, float | int | None]] = {}
     
     synapse_responses = await _dendrite_with_retries(
         validator.dendrite,
@@ -252,7 +256,27 @@ async def _run_forward_cycle(validator) -> None:
     for uid, resp in zip(miner_uids, synapse_responses):
         if resp is None:
             bt.logging.debug(f"Miner {uid} returned None response")
+            resp_meta_by_uid[uid] = {"response_time_ms": None, "status_code": None}
             continue
+
+        # Dendrite metadata is optional. Try a few known fields.
+        try:
+            d = getattr(resp, "dendrite", None)
+            status_code = getattr(d, "status_code", None) if d is not None else None
+            response_time_ms = getattr(d, "process_time_ms", None) if d is not None else None
+            if response_time_ms is None and d is not None:
+                pt = getattr(d, "process_time", None)
+                if pt is not None:
+                    try:
+                        response_time_ms = float(pt) * 1000.0
+                    except Exception:
+                        response_time_ms = None
+            resp_meta_by_uid[uid] = {
+                "response_time_ms": None if response_time_ms is None else float(response_time_ms),
+                "status_code": None if status_code is None else int(status_code),
+            }
+        except Exception:
+            resp_meta_by_uid[uid] = {"response_time_ms": None, "status_code": None}
             
         scores = getattr(resp, "risk_scores", None)
         if scores is None:
@@ -299,6 +323,18 @@ async def _run_forward_cycle(validator) -> None:
     
     rewards_array, metrics = _compute_windowed_rewards(validator, miner_uids)
     validator.update_scores(rewards_array, miner_uids)
+
+    # Best-effort: persist cycle metrics in the validator-local platform backend for the admin dashboard.
+    await _post_cycle_metrics(
+        validator=validator,
+        miner_uids=miner_uids,
+        rewards_array=rewards_array,
+        metrics=metrics,
+        batch_count=len(chunks),
+        hand_count=total_hands,
+        resp_meta_by_uid=resp_meta_by_uid,
+    )
+
     bt.logging.info("Rewards issued for %d miners.", len(rewards_array))
     bt.logging.info(
         f"[Forward #{validator.forward_count}] complete. Sleeping {validator.poll_interval}s before next tick.",
@@ -348,6 +384,96 @@ def _compute_windowed_rewards(validator, miner_uids: List[int]) -> tuple[np.ndar
             return burned_rewards, metrics
     
     return rewards_array, metrics
+
+
+async def _post_cycle_metrics(
+    *,
+    validator,
+    miner_uids: List[int],
+    rewards_array: np.ndarray,
+    metrics: List[dict],
+    batch_count: int,
+    hand_count: int,
+    resp_meta_by_uid: Dict[int, Dict[str, float | int | None]],
+) -> None:
+    platform_url = (os.getenv("POKER44_PLATFORM_BACKEND_URL") or "").strip().rstrip("/")
+    secret = (os.getenv("POKER44_INTERNAL_EVAL_SECRET") or "").strip()
+    if not platform_url or not secret:
+        return
+
+    validator_id = (os.getenv("POKER44_VALIDATOR_ID") or "").strip() or None
+    validator_name = (os.getenv("POKER44_VALIDATOR_NAME") or "poker44-validator").strip() or "poker44-validator"
+
+    # Best-effort net context (nice for dashboards).
+    netuid = getattr(getattr(validator, "config", None), "netuid", None)
+    network = getattr(getattr(getattr(validator, "config", None), "subtensor", None), "network", None)
+
+    if validator_id is None:
+        # Fallback: some validator objects have wallet.hotkey.ss58_address.
+        try:
+            validator_id = validator.wallet.hotkey.ss58_address
+        except Exception:
+            validator_id = "unknown"
+
+    miners_payload: list[dict] = []
+    hotkeys = getattr(getattr(validator, "metagraph", None), "hotkeys", None)
+    scores = getattr(validator, "scores", None)
+
+    for idx, uid in enumerate(miner_uids):
+        hotkey = None
+        if isinstance(hotkeys, list) and 0 <= uid < len(hotkeys):
+            hotkey = hotkeys[uid]
+
+        moving_score = None
+        try:
+            if scores is not None and 0 <= uid < len(scores):
+                moving_score = float(scores[uid])
+        except Exception:
+            moving_score = None
+
+        reward_v = float(rewards_array[idx]) if idx < len(rewards_array) else 0.0
+        m = metrics[idx] if idx < len(metrics) else {}
+        meta = resp_meta_by_uid.get(uid, {})
+
+        miners_payload.append(
+            {
+                "uid": int(uid),
+                "hotkey": hotkey,
+                "reward": float(reward_v),
+                "moving_score": moving_score,
+                "response_time_ms": meta.get("response_time_ms"),
+                "f1": m.get("f1_score"),
+                "ap": m.get("ap_score"),
+                "fp": m.get("fp_score"),
+                "penalty": m.get("penalty"),
+            }
+        )
+
+    payload = {
+        "validator_id": validator_id,
+        "validator_name": validator_name,
+        "network": network,
+        "netuid": netuid,
+        "forward_count": int(getattr(validator, "forward_count", 0)),
+        "batch_count": int(batch_count),
+        "hand_count": int(hand_count),
+        "created_ts": int(time.time()),
+        "miners": miners_payload,
+    }
+
+    url = f"{platform_url}/internal/metrics/ingest-cycle"
+
+    def _do_post() -> None:
+        try:
+            requests.post(url, json=payload, headers={"x-eval-secret": secret}, timeout=2.5)
+        except Exception:
+            # best-effort; ignore
+            pass
+
+    try:
+        await asyncio.to_thread(_do_post)
+    except Exception:
+        return
 
 async def _dendrite_with_retries(
     dendrite: bt.dendrite,

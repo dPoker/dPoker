@@ -125,6 +125,7 @@ network="${NETWORK:-test}"
 
 validator_wallet="${VALIDATOR_WALLET:-poker44-test}"
 validator_hotkey="${VALIDATOR_HOTKEY:-default}"
+validator_friendly_name="${POKER44_VALIDATOR_NAME:-poker44-validator}"
 
 miner_wallet="${MINER_WALLET:-owner}"
 miner_hotkeys_csv="${MINER_HOTKEYS:-miner1}"
@@ -180,6 +181,7 @@ MINER_AXON_PORT_BASE=$miner_axon_port_base
 FRONTEND_URL=$frontend_url
 PLATFORM_URL=$platform_url
 DIRECTORY_URL=$directory_url
+VALIDATOR_NAME=$validator_friendly_name
 
 DIRECTORY_SHARED_SECRET=$directory_secret
 INTERNAL_EVAL_SECRET=$internal_eval_secret
@@ -338,6 +340,7 @@ POKER44_AUTOSIMULATE="$autosimulate" \
 POKER44_TASK_BATCH_SIZE="$task_batch_size" \
 POKER44_QUERY_HOTKEYS="$miner_ss58_csv" \
 POKER44_VALIDATOR_ID="$validator_ss58" \
+POKER44_VALIDATOR_NAME="$validator_friendly_name" \
 pm2 start "$venv_dir/bin/python" \
   --name "$validator_name" \
   --cwd "$repo_dir" \

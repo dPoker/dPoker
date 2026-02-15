@@ -315,6 +315,9 @@ class Validator(BaseValidatorNeuron):
         if not validator_id:
             validator_id = self.wallet.hotkey.ss58_address
 
+        # Friendly, non-unique name for UI/debug in the directory.
+        validator_name = (os.getenv("POKER44_VALIDATOR_NAME") or "poker44-validator").strip() or "poker44-validator"
+
         platform_base_url = (os.getenv("POKER44_PLATFORM_BACKEND_URL") or "http://localhost:3001").strip()
         platform_public_url = (os.getenv("POKER44_PLATFORM_PUBLIC_URL") or platform_base_url).strip().rstrip("/")
         internal_secret = (os.getenv("POKER44_INTERNAL_EVAL_SECRET") or "").strip()
@@ -355,6 +358,7 @@ class Validator(BaseValidatorNeuron):
                 try:
                     client.announce(
                         validator_id=validator_id,
+                        validator_name=validator_name,
                         platform_url=platform_public_url,
                         room_code=room_code,
                         region=region,

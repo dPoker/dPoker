@@ -172,6 +172,7 @@ def _announce_loop(
     *,
     directory: RoomDirectoryClient,
     validator_id: str,
+    validator_name: str,
     platform_url: str,
     secret: str,
     room_code: Optional[str],
@@ -197,6 +198,7 @@ def _announce_loop(
         try:
             directory.announce(
                 validator_id=validator_id,
+                validator_name=validator_name,
                 platform_url=platform_url,
                 room_code=room_code,
                 region=region,
@@ -221,6 +223,7 @@ async def main() -> int:
         return 2
 
     validator_id = _getenv("VALIDATOR_ID", "vali-dev-1") or "vali-dev-1"
+    validator_name = _getenv("VALIDATOR_NAME", "poker44-validator") or "poker44-validator"
     region = _getenv("REGION", "unknown") or "unknown"
     version_hash = _getenv("VERSION_HASH", "poker44-validator-p2p-v0") or "poker44-validator-p2p-v0"
     capacity_tables = int(_getenv("CAPACITY_TABLES", "1") or "1")
@@ -263,6 +266,7 @@ async def main() -> int:
             kwargs={
                 "directory": directory,
                 "validator_id": validator_id,
+                "validator_name": validator_name,
                 "platform_url": platform_url,
                 "secret": secret,
                 "room_code": room_code,

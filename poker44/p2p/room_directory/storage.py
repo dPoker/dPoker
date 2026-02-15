@@ -12,6 +12,7 @@ class InMemoryDirectory:
     def upsert(self, ann: ValidatorAnnounce) -> None:
         self._rooms[ann.validator_id] = RoomListing(
             validator_id=ann.validator_id,
+            validator_name=ann.validator_name,
             platform_url=ann.platform_url,
             room_code=ann.room_code,
             region=ann.region,
@@ -29,4 +30,3 @@ class InMemoryDirectory:
         # Prefer more capacity, then most recent.
         active.sort(key=lambda x: (x.capacity_tables, x.last_seen), reverse=True)
         return active
-

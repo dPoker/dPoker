@@ -25,6 +25,7 @@ class RoomDirectoryClient:
         self,
         *,
         validator_id: str,
+        validator_name: str,
         platform_url: str,
         room_code: Optional[str],
         region: str,
@@ -33,6 +34,7 @@ class RoomDirectoryClient:
     ) -> None:
         payload = {
             "validator_id": validator_id,
+            "validator_name": validator_name,
             "platform_url": platform_url,
             "room_code": room_code,
             "region": region,
@@ -53,4 +55,3 @@ class RoomDirectoryClient:
         r.raise_for_status()
         data = r.json()
         return data if isinstance(data, list) else []
-
