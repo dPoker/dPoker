@@ -6,7 +6,9 @@ set -euo pipefail
 # - 3 miners (testnet)
 # - 2 validators (testnet), each with its own platform backend + DB + indexer
 #
-# One validator can be marked "dangerous" by setting INDEXER_TEE_ENABLED=false.
+# Validators can be marked "dangerous" by:
+# - disabling the attestation bundle endpoint: INDEXER_DISABLE_BUNDLE_*=true
+# - publishing tee_enabled=false in the bundle: INDEXER_TEE_ENABLED_*=false
 #
 # Usage:
 #   cd poker44-subnet
@@ -162,11 +164,12 @@ POKER44_DIRECTORY_URL="$directory_url" \
 DIRECTORY_SHARED_SECRET="$directory_secret" \
 INTERNAL_EVAL_SECRET="$internal_eval_secret" \
 POKER44_VALIDATOR_NAME="poker44-validator-1" \
-INDEXER_TEE_ENABLED="true" \
+INDEXER_TEE_ENABLED="${INDEXER_TEE_ENABLED_VALI1:-true}" \
+INDEXER_DISABLE_BUNDLE="${INDEXER_DISABLE_BUNDLE_VALI1:-false}" \
 POKER44_AUTOSIMULATE="true" \
 bash "$repo_dir/scripts/deploy/pm2/up-validator-stack.sh"
 
-# Validator 2 (dangerous)
+# Validator 2 (dangerous by default)
 PM2_PREFIX="${PM2_PREFIX_VALI2:-poker44-vali2}" \
 NETWORK="$network" NETUID="$netuid" \
 VALIDATOR_WALLET="$validator_wallet" VALIDATOR_HOTKEY="$validator2_hotkey" \
@@ -181,6 +184,7 @@ DIRECTORY_SHARED_SECRET="$directory_secret" \
 INTERNAL_EVAL_SECRET="$internal_eval_secret" \
 POKER44_VALIDATOR_NAME="poker44-validator-2" \
 INDEXER_TEE_ENABLED="${INDEXER_TEE_ENABLED_VALI2:-false}" \
+INDEXER_DISABLE_BUNDLE="${INDEXER_DISABLE_BUNDLE_VALI2:-false}" \
 POKER44_AUTOSIMULATE="true" \
 bash "$repo_dir/scripts/deploy/pm2/up-validator-stack.sh"
 
@@ -191,4 +195,3 @@ log "Directory:"
 log "  $directory_url/rooms"
 log "Ledger:"
 log "  $ledger_api_url"
-

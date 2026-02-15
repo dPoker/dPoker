@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import bittensor as bt
 import requests
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from poker44.p2p.schemas import RoomListing
@@ -314,12 +314,16 @@ def healthz():
         "validator_id": vid,
         "validator_name": vname,
         "tee_enabled": _bool_env("INDEXER_TEE_ENABLED", True),
+        "bundle_enabled": not _bool_env("INDEXER_DISABLE_BUNDLE", False),
         "epoch": _epoch(now, epoch_seconds),
     }
 
 
 @app.get("/attestation/bundle", response_model=AttestationBundle)
 def attestation_bundle():
+    if _bool_env("INDEXER_DISABLE_BUNDLE", False):
+        # Simulate a validator that is not publishing attestations at all.
+        raise HTTPException(status_code=404, detail="Attestation bundle disabled")
     now = int(time.time())
     epoch_seconds = _int_env("INDEXER_EPOCH_SECONDS", 60)
     return _build_bundle(now, epoch_seconds)

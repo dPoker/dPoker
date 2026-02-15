@@ -144,6 +144,7 @@ fi
 indexer_public_url="${POKER44_INDEXER_PUBLIC_URL:-http://127.0.0.1:${indexer_port}}"
 indexer_public_url="${indexer_public_url%/}"
 indexer_tee_enabled="${INDEXER_TEE_ENABLED:-true}"
+indexer_disable_bundle="${INDEXER_DISABLE_BUNDLE:-false}"
 
 # Postgres/Redis (per-validator)
 compose_project="${COMPOSE_PROJECT_NAME:-$pm2_prefix}"
@@ -285,6 +286,7 @@ INDEXER_WALLET_NAME="$validator_wallet" \
 INDEXER_WALLET_HOTKEY="$validator_hotkey" \
 INDEXER_VALIDATOR_NAME="$validator_friendly_name" \
 INDEXER_TEE_ENABLED="$indexer_tee_enabled" \
+INDEXER_DISABLE_BUNDLE="$indexer_disable_bundle" \
 INDEXER_DIRECTORY_URL="$directory_url" \
 pm2 start "$venv_dir/bin/python" \
   --name "$indexer_name" \
