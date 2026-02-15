@@ -265,6 +265,7 @@ pm2_delete_if_exists "$directory_name"
 cd "$repo_dir"
 DIRECTORY_SHARED_SECRET="$directory_secret" \
 DIRECTORY_TTL_SECONDS="$directory_ttl_seconds" \
+DIRECTORY_CORS_ORIGINS="$cors_origins" \
 pm2 start "$venv_dir/bin/python" \
   --name "$directory_name" \
   --cwd "$repo_dir" \
@@ -367,4 +368,3 @@ log "  pm2 ls | rg \"$pm2_prefix\""
 log "  pm2 logs \"$validator_name\""
 log "Down:"
 log "  bash $repo_dir/scripts/deploy/pm2/down.sh"
-
