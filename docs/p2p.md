@@ -153,6 +153,32 @@ Para ver el estado:
 - `pm2 logs poker44-p2p-validator-test-default --lines 200`
 - `pm2 logs poker44-p2p-miner-test-miner1 --lines 200`
 
+## Deploy modular (desacoplado)
+
+Topologia objetivo:
+
+- **Central** (infra comun): `room_directory` + `platform frontend`
+- **Por validator** (infra del operador): `platform backend` + `validator` (+ su Postgres/Redis)
+- **Por miner** (infra del operador): `miner`
+
+Scripts PM2 (MVP):
+
+- Central:
+  - `bash poker44-subnet/scripts/deploy/pm2/up-directory.sh` (solo directory)
+  - `bash poker44-subnet/scripts/deploy/pm2/up-central.sh` (directory + frontend)
+- Validator operator:
+  - `bash poker44-subnet/scripts/deploy/pm2/up-validator-stack.sh` (backend + validator)
+
+Variables importantes en modo desacoplado:
+
+- El directory es un servicio HTTP publico:
+  - `DIRECTORY_SHARED_SECRET` debe coincidir con el validator.
+- El validator debe anunciar un `platform_url` reachable por usuarios (no `127.0.0.1`):
+  - setea `POKER44_PLATFORM_PUBLIC_URL=https://<tu-dominio-o-ip>:<port>`
+- El backend debe permitir CORS + cookies desde el frontend:
+  - `CORS_ORIGINS=https://<frontend-domain>`
+  - En prod: `COOKIE_DOMAIN=.poker44.com` + HTTPS (SameSite=None, Secure)
+
 ## Smoke / tests
 
 - Smoke (stack P2P + internal endpoints + directory):
@@ -207,5 +233,4 @@ Estamos construyendo una plataforma de poker P2P donde **cada validator corre su
 - Selection P2P en frontend: ahora es “auto-pick primero”; mas adelante: balancear por region/capacity/latency.
 - Commit-reveal timelocked: las weights no aparecen instantaneamente; hay que esperar reveal.
 - Scoring miner: actualmente es baseline/mock (mejorar scoring y anti-collusion).
-- Reward “burn UID0”: la implementacion actual aplica el burn al primer elemento del subset consultado si UID0 no esta incluido (hay que mapear a UIDs globales correctamente).
-
+- Reward “burn UID0”: fixed para que el burn vaya al UID 0 global (no al indice 0 del subset consultado).
