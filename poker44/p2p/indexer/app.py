@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -39,6 +40,7 @@ def _epoch(now_ts: int, epoch_seconds: int) -> int:
     return int(now_ts // s)
 
 _METAGRAPH_CACHE: Dict[str, Any] = {"ts": 0.0, "network": "", "netuid": 0, "mg": None}
+_STATE_CACHE: Dict[str, Any] = {"ts": 0.0, "epoch": None, "state": None}
 
 
 def _metagraph_config() -> Tuple[str, int]:
@@ -49,7 +51,7 @@ def _metagraph_config() -> Tuple[str, int]:
     return network, int(netuid)
 
 
-def _get_metagraph(*, ttl_s: int = 30) -> Optional[Any]:
+def _get_metagraph(*, ttl_s: int = 30, allow_fetch: bool = True) -> Optional[Any]:
     try:
         network, netuid = _metagraph_config()
         if netuid <= 0:
@@ -63,6 +65,9 @@ def _get_metagraph(*, ttl_s: int = 30) -> Optional[Any]:
         ):
             return _METAGRAPH_CACHE.get("mg")
 
+        if not allow_fetch:
+            return None
+
         # Bittensor SDK changed around v10: `bt.subtensor()` was replaced by `bt.Subtensor`.
         subtensor = bt.subtensor(network=network) if hasattr(bt, "subtensor") else bt.Subtensor(network=network)
         mg = subtensor.metagraph(netuid=netuid)
@@ -73,7 +78,8 @@ def _get_metagraph(*, ttl_s: int = 30) -> Optional[Any]:
 
 
 def _metagraph_row(hotkey: str) -> Tuple[Optional[int], Optional[float], Optional[bool]]:
-    mg = _get_metagraph()
+    # Never block request handlers on an on-chain fetch; metagraph is warmed in the background.
+    mg = _get_metagraph(allow_fetch=False)
     if mg is None:
         return None, None, None
     try:
@@ -267,8 +273,9 @@ def _compute_directory_state(directory_url: str, *, epoch_seconds: int) -> Direc
     rooms = _list_directory_rooms(directory_url)
     warnings: List[str] = []
 
-    # Best-effort metagraph snapshot (stake/permit). Cached to avoid hammering the chain.
-    mg = _get_metagraph()
+    # Best-effort metagraph snapshot (stake/permit). We never block request handlers
+    # on an on-chain fetch; a background worker warms the cache.
+    mg = _get_metagraph(allow_fetch=False)
 
     # Voter set: validators with an indexer_url (from directory).
     voter_rooms = [r for r in rooms if r.indexer_url]
@@ -363,6 +370,31 @@ def _compute_directory_state(directory_url: str, *, epoch_seconds: int) -> Direc
     )
 
 
+def _state_cache_ttl_s() -> int:
+    return max(0, _int_env("INDEXER_STATE_CACHE_TTL_S", 5))
+
+
+def _compute_directory_state_cached(directory_url: str, *, epoch_seconds: int) -> DirectoryState:
+    """
+    Cache the full directory state for a short TTL to keep /attestation/status responsive.
+    """
+    ttl_s = float(_state_cache_ttl_s())
+    now_ts = int(time.time())
+    e = _epoch(now_ts, epoch_seconds)
+
+    if ttl_s > 0:
+        cached = _STATE_CACHE.get("state")
+        cached_epoch = _STATE_CACHE.get("epoch")
+        cached_ts = float(_STATE_CACHE.get("ts") or 0.0)
+        if cached is not None and int(cached_epoch or -1) == int(e) and (time.time() - cached_ts) <= ttl_s:
+            return cached
+
+    state = _compute_directory_state(directory_url, epoch_seconds=epoch_seconds)
+    if ttl_s > 0:
+        _STATE_CACHE.update({"ts": time.time(), "epoch": e, "state": state})
+    return state
+
+
 app = FastAPI(title="poker44 Validator Indexer", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -371,6 +403,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _startup_background_tasks() -> None:
+    # Warm on-chain metagraph data in the background so read APIs stay fast.
+    network, netuid = _metagraph_config()
+    if netuid <= 0:
+        return
+    if not _bool_env("INDEXER_ENABLE_METAGRAPH_WARM", True):
+        return
+
+    poll_s = max(5, _int_env("INDEXER_METAGRAPH_POLL_S", 10))
+    ttl_s = max(5, _int_env("INDEXER_METAGRAPH_TTL_S", 30))
+
+    def _loop() -> None:
+        while True:
+            _get_metagraph(ttl_s=ttl_s, allow_fetch=True)
+            time.sleep(poll_s)
+
+    threading.Thread(target=_loop, daemon=True).start()
 
 
 @app.get("/healthz")
@@ -420,14 +472,14 @@ def attestation_votes(epoch: Optional[int] = None):
 def directory_state():
     directory_url = (os.getenv("INDEXER_DIRECTORY_URL") or os.getenv("POKER44_DIRECTORY_URL") or "").strip().rstrip("/")
     epoch_seconds = _int_env("INDEXER_EPOCH_SECONDS", 60)
-    return _compute_directory_state(directory_url, epoch_seconds=epoch_seconds)
+    return _compute_directory_state_cached(directory_url, epoch_seconds=epoch_seconds)
 
 
 @app.get("/attestation/status/{validator_id}", response_model=ValidatorStatus)
 def attestation_status(validator_id: str):
     directory_url = (os.getenv("INDEXER_DIRECTORY_URL") or os.getenv("POKER44_DIRECTORY_URL") or "").strip().rstrip("/")
     epoch_seconds = _int_env("INDEXER_EPOCH_SECONDS", 60)
-    state = _compute_directory_state(directory_url, epoch_seconds=epoch_seconds)
+    state = _compute_directory_state_cached(directory_url, epoch_seconds=epoch_seconds)
     for v in state.validators:
         if v.validator_id == validator_id:
             return v
