@@ -276,6 +276,10 @@ def _compute_directory_state(directory_url: str, *, epoch_seconds: int) -> Direc
     # Best-effort metagraph snapshot (stake/permit). We never block request handlers
     # on an on-chain fetch; a background worker warms the cache.
     mg = _get_metagraph(allow_fetch=False)
+    if mg is None:
+        # Fallback: if the background warmer hasn't populated the cache (or startup events are disabled),
+        # do a best-effort on-demand fetch. This happens at most once per metagraph TTL.
+        mg = _get_metagraph(allow_fetch=True)
 
     # Voter set: validators with an indexer_url (from directory).
     voter_rooms = [r for r in rooms if r.indexer_url]
