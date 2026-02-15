@@ -278,6 +278,9 @@ pm2_delete_if_exists "$backend_name"
 PORT="$backend_port" \
 INTERNAL_EVAL_SECRET="$internal_eval_secret" \
 CORS_ORIGINS="$cors_origins" \
+# Keep auth sessions persistent in dev. Backend uses HTTP-only cookies (no localStorage token).
+JWT_EXPIRES_IN="${JWT_EXPIRES_IN:-30d}" \
+COOKIE_MAX_AGE="${COOKIE_MAX_AGE:-2592000000}" \
 pm2 start npm \
   --name "$backend_name" \
   --cwd "$platform_backend_dir" \
