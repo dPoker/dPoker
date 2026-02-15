@@ -419,6 +419,14 @@ async def _post_cycle_metrics(
     hotkeys = getattr(getattr(validator, "metagraph", None), "hotkeys", None)
     scores = getattr(validator, "scores", None)
 
+    def _to_float(v):  # noqa: ANN001 - local helper for JSON-safe casting
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except Exception:
+            return None
+
     for idx, uid in enumerate(miner_uids):
         hotkey = None
         if isinstance(hotkeys, list) and 0 <= uid < len(hotkeys):
@@ -442,10 +450,10 @@ async def _post_cycle_metrics(
                 "reward": float(reward_v),
                 "moving_score": moving_score,
                 "response_time_ms": meta.get("response_time_ms"),
-                "f1": m.get("f1_score"),
-                "ap": m.get("ap_score"),
-                "fp": m.get("fp_score"),
-                "penalty": m.get("penalty"),
+                "f1": _to_float(m.get("f1_score")),
+                "ap": _to_float(m.get("ap_score")),
+                "fp": _to_float(m.get("fp_score")),
+                "penalty": _to_float(m.get("penalty")),
             }
         )
 
