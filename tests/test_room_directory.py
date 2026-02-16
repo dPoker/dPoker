@@ -2,15 +2,20 @@ import time
 
 from fastapi.testclient import TestClient
 
-from poker44.p2p.crypto import hmac_sign
+import bittensor as bt
+
+from poker44.p2p.indexer.signing import sign_payload
 from poker44.p2p.room_directory.app import app
 
 
 def test_directory_announce_and_list():
     client = TestClient(app)
 
+    kp = bt.Keypair.create_from_mnemonic(
+        "legal winner thank year wave sausage worth useful legal winner thank yellow"
+    )
     payload = {
-        "validator_id": "vali-1",
+        "validator_id": kp.ss58_address,
         "validator_name": "poker44-validator",
         "platform_url": "http://localhost:3001",
         "indexer_url": None,
@@ -20,7 +25,7 @@ def test_directory_announce_and_list():
         "version_hash": "v0",
         "timestamp": int(time.time()),
     }
-    sig = hmac_sign(payload, "dev-secret")
+    sig = sign_payload(payload, keypair=kp)
 
     r = client.post("/announce", json={**payload, "signature": sig})
     assert r.status_code == 200
@@ -31,11 +36,12 @@ def test_directory_announce_and_list():
     rooms = r2.json()
     assert isinstance(rooms, list)
     assert len(rooms) >= 1
-    assert rooms[0]["validator_id"] == "vali-1"
+    assert rooms[0]["validator_id"] == kp.ss58_address
     assert rooms[0]["validator_name"] == "poker44-validator"
+    assert rooms[0]["signature"] == sig
 
 
-def test_directory_rejects_bad_signature():
+def test_directory_rejects_missing_signature():
     client = TestClient(app)
     payload = {
         "validator_id": "vali-bad",
@@ -47,7 +53,7 @@ def test_directory_rejects_bad_signature():
         "capacity_tables": 1,
         "version_hash": "v0",
         "timestamp": int(time.time()),
-        "signature": "deadbeef",
     }
     r = client.post("/announce", json=payload)
-    assert r.status_code == 401
+    # Signature is required by the request schema, so FastAPI rejects before hitting the handler.
+    assert r.status_code == 422

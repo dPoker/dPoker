@@ -17,6 +17,7 @@ from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 
 import requests
+import bittensor as bt
 
 from poker44.validator.forward import forward as forward_cycle
 from poker44.validator.synapse import DetectionSynapse
@@ -29,6 +30,13 @@ def _getenv(key: str, default: Optional[str] = None) -> Optional[str]:
     """Read env var using the `POKER44_` prefix."""
 
     return os.getenv(f"POKER44_{key}") or default
+
+
+def _make_keypair() -> bt.Keypair:
+    mnemonic = (_getenv("VALIDATOR_MNEMONIC", "") or "").strip()
+    if not mnemonic:
+        mnemonic = bt.Keypair.generate_mnemonic()
+    return bt.Keypair.create_from_mnemonic(mnemonic)
 
 
 @dataclass
@@ -222,14 +230,14 @@ async def main() -> int:
         print("Missing POKER44_INTERNAL_EVAL_SECRET")
         return 2
 
-    validator_id = _getenv("VALIDATOR_ID", "vali-dev-1") or "vali-dev-1"
+    keypair = _make_keypair()
+    validator_id = keypair.ss58_address
     validator_name = _getenv("VALIDATOR_NAME", "poker44-validator") or "poker44-validator"
     region = _getenv("REGION", "unknown") or "unknown"
     version_hash = _getenv("VERSION_HASH", "poker44-validator-p2p-v0") or "poker44-validator-p2p-v0"
     capacity_tables = int(_getenv("CAPACITY_TABLES", "1") or "1")
 
     directory_url = (_getenv("DIRECTORY_URL", "http://localhost:8010") or "").rstrip("/")
-    directory_secret = _getenv("DIRECTORY_SHARED_SECRET", "dev-secret") or "dev-secret"
     announce_interval_s = int(_getenv("ANNOUNCE_INTERVAL_S", "10") or "10")
 
     # Health checks
@@ -260,7 +268,7 @@ async def main() -> int:
 
     # Start directory announcer in background (best-effort).
     if directory_url:
-        directory = RoomDirectoryClient(directory_url, directory_secret)
+        directory = RoomDirectoryClient(directory_url, keypair)
         t = threading.Thread(
             target=_announce_loop,
             kwargs={

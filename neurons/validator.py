@@ -304,11 +304,6 @@ class Validator(BaseValidatorNeuron):
         if not directory_url:
             return
 
-        directory_secret = (os.getenv("POKER44_DIRECTORY_SHARED_SECRET") or "").strip()
-        if not directory_secret:
-            bt.logging.warning("POKER44_DIRECTORY_SHARED_SECRET not set; cannot announce to directory.")
-            return
-
         region = (os.getenv("POKER44_REGION") or "unknown").strip() or "unknown"
         capacity_tables = int(os.getenv("POKER44_CAPACITY_TABLES") or "1")
         version_hash = (os.getenv("POKER44_VERSION_HASH") or f"poker44-validator-{__version__}").strip()
@@ -335,7 +330,7 @@ class Validator(BaseValidatorNeuron):
                 validator_id=validator_id,
             )
 
-        client = RoomDirectoryClient(directory_url, directory_secret)
+        client = RoomDirectoryClient(directory_url, self.wallet.hotkey)
 
         def _loop() -> None:
             nonlocal room_code

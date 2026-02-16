@@ -10,6 +10,8 @@ import pytest
 import uvicorn
 from fastapi import FastAPI
 
+import bittensor as bt
+
 from poker44.p2p.room_directory.app import app as directory_app
 
 
@@ -95,12 +97,14 @@ def test_p2p_runner_announces_room_and_runs_mock_cycle(monkeypatch):
     # Run the mock validator runner once.
     from scripts.validator.p2p.run_mock_validator import main as runner_main
 
+    mnemonic = "legal winner thank year wave sausage worth useful legal winner thank yellow"
+    expected_validator_id = bt.Keypair.create_from_mnemonic(mnemonic).ss58_address
+
     monkeypatch.setenv("POKER44_PROVIDER", "platform")
     monkeypatch.setenv("POKER44_PLATFORM_BACKEND_URL", f"http://127.0.0.1:{plat_port}")
     monkeypatch.setenv("POKER44_INTERNAL_EVAL_SECRET", "dev-internal-eval-secret")
     monkeypatch.setenv("POKER44_DIRECTORY_URL", f"http://127.0.0.1:{dir_port}")
-    monkeypatch.setenv("POKER44_DIRECTORY_SHARED_SECRET", "dev-secret")
-    monkeypatch.setenv("POKER44_VALIDATOR_ID", "vali-it-1")
+    monkeypatch.setenv("POKER44_VALIDATOR_MNEMONIC", mnemonic)
     monkeypatch.setenv("POKER44_ANNOUNCE_INTERVAL_S", "1")
     monkeypatch.setenv("POKER44_MOCK_MINERS", "2")
 
@@ -111,7 +115,7 @@ def test_p2p_runner_announces_room_and_runs_mock_cycle(monkeypatch):
     deadline = time.time() + 5.0
     while time.time() < deadline:
         rooms = requests.get(f"http://127.0.0.1:{dir_port}/rooms", timeout=2.0).json()
-        if any(r.get("validator_id") == "vali-it-1" for r in rooms):
+        if any(r.get("validator_id") == expected_validator_id for r in rooms):
             break
         time.sleep(0.1)
     else:

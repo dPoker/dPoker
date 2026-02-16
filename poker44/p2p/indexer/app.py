@@ -132,9 +132,34 @@ def _list_directory_rooms(directory_url: str) -> List[RoomListing]:
     out: List[RoomListing] = []
     for item in data:
         try:
-            out.append(RoomListing(**item))
+            r = RoomListing(**item)
         except Exception:
             continue
+
+        # Verify that this room listing was announced by the validator hotkey.
+        # The directory itself is a lightweight store; indexers are the trust gate.
+        try:
+            now = int(time.time())
+            if abs(now - int(r.timestamp)) > 300:
+                continue
+
+            payload = {
+                "validator_id": r.validator_id,
+                "validator_name": r.validator_name,
+                "platform_url": r.platform_url,
+                "indexer_url": r.indexer_url,
+                "room_code": r.room_code,
+                "region": r.region,
+                "capacity_tables": int(r.capacity_tables),
+                "version_hash": r.version_hash,
+                "timestamp": int(r.timestamp),
+            }
+            if not verify_payload(payload, ss58_address=r.validator_id, signature_hex=r.signature):
+                continue
+        except Exception:
+            continue
+
+        out.append(r)
     return out
 
 

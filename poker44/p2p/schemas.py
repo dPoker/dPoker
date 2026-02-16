@@ -22,7 +22,10 @@ class ValidatorAnnounce(BaseModel):
     version_hash: str
     timestamp: int
 
-    # HMAC signature over all fields except signature.
+    # Hotkey signature (sr25519) over all fields except signature.
+    #
+    # Canonicalization must match:
+    #   json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     signature: str
 
 
@@ -35,6 +38,10 @@ class RoomListing(BaseModel):
     region: str
     capacity_tables: int
     version_hash: str
+    # Announcement timestamp (unix seconds), as signed by the validator.
+    timestamp: int
+    # Validator hotkey signature (sr25519) over all fields except signature/last_seen.
+    signature: str
     last_seen: int
 
 

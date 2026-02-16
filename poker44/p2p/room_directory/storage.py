@@ -19,6 +19,8 @@ class InMemoryDirectory:
             region=ann.region,
             capacity_tables=ann.capacity_tables,
             version_hash=ann.version_hash,
+            timestamp=ann.timestamp,
+            signature=ann.signature,
             last_seen=int(time.time()),
         )
 

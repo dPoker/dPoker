@@ -3,9 +3,10 @@ from __future__ import annotations
 import time
 from typing import Optional
 
+import bittensor as bt
 import requests
 
-from poker44.p2p.crypto import hmac_sign
+from poker44.p2p.indexer.signing import sign_payload
 from poker44.p2p.schemas import ValidatorAnnounce
 
 
@@ -13,12 +14,12 @@ class RoomDirectoryClient:
     def __init__(
         self,
         directory_url: str,
-        shared_secret: str,
+        keypair: bt.Keypair,
         *,
         timeout_s: float = 5.0,
     ) -> None:
         self.directory_url = directory_url.rstrip("/")
-        self.shared_secret = shared_secret
+        self.keypair = keypair
         self.timeout_s = timeout_s
 
     def announce(
@@ -33,6 +34,13 @@ class RoomDirectoryClient:
         capacity_tables: int,
         version_hash: str,
     ) -> None:
+        # The directory payload is verified by indexers/ledger using validator_id as the signer.
+        # Enforce that the supplied validator_id matches the signing hotkey.
+        validator_id = str(validator_id).strip()
+        if not validator_id:
+            raise ValueError("validator_id is required")
+        if validator_id != self.keypair.ss58_address:
+            raise ValueError("validator_id must match signing keypair ss58_address")
         payload = {
             "validator_id": validator_id,
             "validator_name": validator_name,
@@ -44,7 +52,7 @@ class RoomDirectoryClient:
             "version_hash": version_hash,
             "timestamp": int(time.time()),
         }
-        sig = hmac_sign(payload, self.shared_secret)
+        sig = sign_payload(payload, keypair=self.keypair)
         ann = ValidatorAnnounce(**payload, signature=sig)
         requests.post(
             f"{self.directory_url}/announce",

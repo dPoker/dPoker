@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-from poker44.p2p.crypto import hmac_verify
+import bittensor as bt
+
+from poker44.p2p.indexer.signing import verify_payload
 from poker44.p2p.directory_client import RoomDirectoryClient
 
 
@@ -22,9 +24,12 @@ def test_directory_client_signs_payload(monkeypatch):
 
     monkeypatch.setattr(mod.requests, "post", fake_post)
 
-    client = RoomDirectoryClient("http://dir", "shh", timeout_s=3.0)
+    kp = bt.Keypair.create_from_mnemonic(
+        "legal winner thank year wave sausage worth useful legal winner thank yellow"
+    )
+    client = RoomDirectoryClient("http://dir", kp, timeout_s=3.0)
     client.announce(
-        validator_id="vali-1",
+        validator_id=kp.ss58_address,
         validator_name="poker44-validator",
         platform_url="http://platform",
         room_code="ABC123",
@@ -41,5 +46,4 @@ def test_directory_client_signs_payload(monkeypatch):
     payload = dict(body)
     sig = payload.pop("signature")
     assert payload["validator_name"] == "poker44-validator"
-    assert hmac_verify(payload, "shh", sig)
-
+    assert verify_payload(payload, ss58_address=kp.ss58_address, signature_hex=sig)
