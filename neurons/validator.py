@@ -29,7 +29,6 @@ import datetime
 from typing import Optional, List, Dict, Any
 
 import bittensor as bt
-from dotenv import load_dotenv
 import requests
 
 from poker44 import __version__
@@ -37,11 +36,11 @@ from poker44.base.validator import BaseValidatorNeuron
 from poker44.bittensor_config import config as bittensor_config
 from poker44.core.hand_json import from_standard_json
 from poker44.core.models import LabeledHandBatch
+from poker44.validator.config import DirectoryAnnounceConfig, PlatformProviderConfig, ReceiptsForwarderConfig, load_validator_env
 from poker44.validator.forward import forward as forward_cycle
 from poker44.hands_generator.data_generator import generate_dataset_array
 from poker44.p2p.directory_client import RoomDirectoryClient
 
-load_dotenv()
 os.makedirs("./logs", exist_ok=True)
 bt.logging.set_trace()
 bt.logging(debug=True, trace=False, logging_dir="./logs", record_log=True)
@@ -232,24 +231,26 @@ class Validator(BaseValidatorNeuron):
         self.forward_count = 0
         # Convenience alias for config fields.
         self.settings = self.config
-        
-        provider_mode = (os.getenv("POKER44_PROVIDER") or "local_generated").strip().lower()
-        self._validate_env_or_die(provider_mode)
+
+        env_cfg = load_validator_env(wallet_hotkey_ss58=self.wallet.hotkey.ss58_address, version=__version__)
+        self.env_cfg = env_cfg
+        provider_mode = env_cfg.provider_mode
+
         if provider_mode == "platform":
             bt.logging.info("🔌 Using PLATFORM backend provider (fresh hands)")
-            platform_backend_url = (os.getenv("POKER44_PLATFORM_BACKEND_URL") or "").strip()
-            internal_eval_secret = (os.getenv("POKER44_INTERNAL_EVAL_SECRET") or "").strip()
+            if env_cfg.platform is None:
+                raise SystemExit("[poker44] internal error: platform config missing for provider_mode=platform")
             self.provider = PlatformBackendProvider(
-                base_url=platform_backend_url,
-                secret=internal_eval_secret,
-                require_mixed=(os.getenv("POKER44_REQUIRE_MIXED") or "true").lower() != "false",
-                timeout_s=float(os.getenv("POKER44_PLATFORM_TIMEOUT_S") or "5.0"),
-                autosimulate=(os.getenv("POKER44_AUTOSIMULATE") or "false").lower() == "true",
-                simulate_humans=int(os.getenv("POKER44_AUTOSIMULATE_HUMANS") or "2"),
-                simulate_bots=int(os.getenv("POKER44_AUTOSIMULATE_BOTS") or "2"),
-                simulate_hands=int(os.getenv("POKER44_AUTOSIMULATE_HANDS") or "3"),
-                simulate_timeout_s=float(os.getenv("POKER44_AUTOSIMULATE_TIMEOUT_S") or "30.0"),
-                min_simulate_interval_s=int(os.getenv("POKER44_AUTOSIMULATE_MIN_INTERVAL_S") or "15"),
+                base_url=env_cfg.platform.base_url,
+                secret=env_cfg.platform.internal_eval_secret,
+                require_mixed=env_cfg.platform.require_mixed,
+                timeout_s=env_cfg.platform.timeout_s,
+                autosimulate=env_cfg.platform.autosimulate,
+                simulate_humans=env_cfg.platform.simulate_humans,
+                simulate_bots=env_cfg.platform.simulate_bots,
+                simulate_hands=env_cfg.platform.simulate_hands,
+                simulate_timeout_s=env_cfg.platform.simulate_timeout_s,
+                min_simulate_interval_s=env_cfg.platform.min_simulate_interval_s,
             )
         else:
             bt.logging.info("📁 Using LOCAL generated data")
@@ -261,69 +262,16 @@ class Validator(BaseValidatorNeuron):
         self.label_buffer = {}
 
         # Optional P2P room directory announcements (directory stores signatures; indexers/ledger verify).
-        self._start_p2p_announcer(provider_mode)
-        self._start_receipts_forwarder(provider_mode)
+        if env_cfg.directory is not None:
+            if env_cfg.platform is None:
+                raise SystemExit("[poker44] internal error: platform config missing while directory enabled")
+            self._start_p2p_announcer(env_cfg.directory, env_cfg.platform)
 
-    def _validate_env_or_die(self, provider_mode: str) -> None:
-        """
-        Fail-fast config validation.
-
-        We intentionally avoid "silent defaults" for the validator runtime so operators
-        get a clear error when env vars / .env are incomplete.
-        """
-
-        def _get_required(name: str) -> str:
-            v = (os.getenv(name) or "").strip()
-            if not v:
-                raise SystemExit(
-                    f"[poker44] Missing required env var: {name}. "
-                    f"Set it in your shell or .env before starting the validator."
-                )
-            return v
-
-        def _is_true(name: str, default: str = "false") -> bool:
-            return (os.getenv(name) or default).strip().lower() in ("1", "true", "yes", "y", "on")
-
-        provider_mode = (provider_mode or "").strip().lower()
-        if provider_mode not in ("platform", "local_generated"):
-            raise SystemExit(f"[poker44] Invalid POKER44_PROVIDER={provider_mode!r} (expected 'platform' or 'local_generated').")
-
-        # Platform provider requires the local poker platform backend + internal secret.
-        if provider_mode == "platform":
-            _get_required("POKER44_PLATFORM_BACKEND_URL")
-            _get_required("POKER44_INTERNAL_EVAL_SECRET")
-
-        directory_url = (os.getenv("POKER44_DIRECTORY_URL") or "").strip().rstrip("/")
-        if directory_url:
-            if provider_mode != "platform":
-                raise SystemExit(
-                    "[poker44] POKER44_DIRECTORY_URL is set but POKER44_PROVIDER != 'platform'. "
-                    "Only platform-backed validators can advertise joinable rooms."
-                )
-            if not directory_url.startswith("http"):
-                raise SystemExit(f"[poker44] POKER44_DIRECTORY_URL must be http(s). Got: {directory_url!r}")
-
-            # Directory announcements are hotkey-signed; ensure operator doesn't misconfigure the id.
-            env_validator_id = (os.getenv("POKER44_VALIDATOR_ID") or "").strip()
-            wallet_id = self.wallet.hotkey.ss58_address
-            if env_validator_id and env_validator_id != wallet_id:
-                raise SystemExit(
-                    "[poker44] POKER44_VALIDATOR_ID must match the validator hotkey ss58 address. "
-                    f"Got {env_validator_id!r}, expected {wallet_id!r}."
-                )
-
-            platform_public_url = (os.getenv("POKER44_PLATFORM_PUBLIC_URL") or "").strip()
-            if platform_public_url and not platform_public_url.startswith("http"):
-                raise SystemExit(f"[poker44] POKER44_PLATFORM_PUBLIC_URL must be http(s). Got: {platform_public_url!r}")
-
-            indexer_public_url = (os.getenv("POKER44_INDEXER_PUBLIC_URL") or "").strip()
-            if indexer_public_url and not indexer_public_url.startswith("http"):
-                raise SystemExit(f"[poker44] POKER44_INDEXER_PUBLIC_URL must be http(s). Got: {indexer_public_url!r}")
-
-        if _is_true("POKER44_RECEIPTS_ENABLED"):
-            if provider_mode != "platform":
-                raise SystemExit("[poker44] POKER44_RECEIPTS_ENABLED requires POKER44_PROVIDER=platform.")
-            _get_required("POKER44_LEDGER_API_URL")
+        # Best-effort: forward signed receipts to a ledger/settlement API.
+        if env_cfg.receipts is not None:
+            if env_cfg.platform is None:
+                raise SystemExit("[poker44] internal error: platform config missing while receipts enabled")
+            self._start_receipts_forwarder(env_cfg.receipts, env_cfg.platform)
 
     def _ensure_room_code(self, *, platform_url: str, secret: str, validator_id: str) -> Optional[str]:
         if not platform_url or not secret:
@@ -364,31 +312,23 @@ class Validator(BaseValidatorNeuron):
             # best-effort: often fails until enough players join
             return
 
-    def _start_p2p_announcer(self, provider_mode: str) -> None:
-        directory_url = (os.getenv("POKER44_DIRECTORY_URL") or "").strip().rstrip("/")
-        if not directory_url:
-            return
+    def _start_p2p_announcer(self, directory_cfg: DirectoryAnnounceConfig, platform_cfg: PlatformProviderConfig) -> None:
+        directory_url = directory_cfg.directory_url
+        region = directory_cfg.region
+        capacity_tables = directory_cfg.capacity_tables
+        version_hash = directory_cfg.version_hash
+        announce_interval_s = directory_cfg.announce_interval_s
+        validator_id = directory_cfg.validator_id
+        validator_name = directory_cfg.validator_name
 
-        region = (os.getenv("POKER44_REGION") or "unknown").strip() or "unknown"
-        capacity_tables = int(os.getenv("POKER44_CAPACITY_TABLES") or "1")
-        version_hash = (os.getenv("POKER44_VERSION_HASH") or f"poker44-validator-{__version__}").strip()
-        announce_interval_s = int(os.getenv("POKER44_ANNOUNCE_INTERVAL_S") or "10")
-
-        validator_id = (os.getenv("POKER44_VALIDATOR_ID") or "").strip()
-        if not validator_id:
-            validator_id = self.wallet.hotkey.ss58_address
-
-        # Friendly, non-unique name for UI/debug in the directory.
-        validator_name = (os.getenv("POKER44_VALIDATOR_NAME") or "poker44-validator").strip() or "poker44-validator"
-
-        platform_base_url = (os.getenv("POKER44_PLATFORM_BACKEND_URL") or "http://localhost:3001").strip()
-        platform_public_url = (os.getenv("POKER44_PLATFORM_PUBLIC_URL") or platform_base_url).strip().rstrip("/")
-        indexer_public_url = (os.getenv("POKER44_INDEXER_PUBLIC_URL") or "").strip().rstrip("/") or None
-        internal_secret = (os.getenv("POKER44_INTERNAL_EVAL_SECRET") or "").strip()
+        platform_base_url = platform_cfg.base_url
+        internal_secret = platform_cfg.internal_eval_secret
+        platform_public_url = directory_cfg.platform_public_url
+        indexer_public_url = directory_cfg.indexer_public_url
 
         # Prefer a fixed room code if provided; otherwise ensure one exists via the local platform backend.
-        room_code: Optional[str] = (os.getenv("POKER44_ROOM_CODE") or "").strip() or None
-        if not room_code and provider_mode == "platform":
+        room_code: Optional[str] = directory_cfg.room_code
+        if not room_code:
             room_code = self._ensure_room_code(
                 platform_url=platform_base_url,
                 secret=internal_secret,
@@ -403,14 +343,13 @@ class Validator(BaseValidatorNeuron):
                 # Ensure the advertised room exists and stays fresh.
                 # Room JSON in Redis has a TTL, while player->room mappings are non-expiring.
                 # Periodically re-ensuring lets the platform recreate rooms if they expired.
-                if provider_mode == "platform":
-                    ensured = self._ensure_room_code(
-                        platform_url=platform_base_url,
-                        secret=internal_secret,
-                        validator_id=validator_id,
-                    )
-                    if ensured:
-                        room_code = ensured
+                ensured = self._ensure_room_code(
+                    platform_url=platform_base_url,
+                    secret=internal_secret,
+                    validator_id=validator_id,
+                )
+                if ensured:
+                    room_code = ensured
 
                 # Best-effort: start the room game as the validator host once enough players joined.
                 self._maybe_start_room(
@@ -439,39 +378,23 @@ class Validator(BaseValidatorNeuron):
 
         threading.Thread(target=_loop, daemon=True).start()
 
-    def _start_receipts_forwarder(self, provider_mode: str) -> None:
+    def _start_receipts_forwarder(self, receipts_cfg: ReceiptsForwarderConfig, platform_cfg: PlatformProviderConfig) -> None:
         """
         Best-effort: forward signed hand receipts to the central ledger for settlement/audit.
 
         This runs alongside the validator and uses the validator hotkey to sign each receipt.
         """
-        enabled = (os.getenv("POKER44_RECEIPTS_ENABLED") or "false").strip().lower() in ("1", "true", "yes", "y", "on")
-        if not enabled:
-            return
-        if provider_mode != "platform":
+        if not receipts_cfg.enabled:
             return
 
-        ledger_api = (os.getenv("POKER44_LEDGER_API_URL") or "").strip().rstrip("/")
-        platform_url = (os.getenv("POKER44_PLATFORM_BACKEND_URL") or "").strip().rstrip("/")
-        secret = (os.getenv("POKER44_INTERNAL_EVAL_SECRET") or "").strip()
-        if not ledger_api or not platform_url or not secret:
-            return
+        ledger_api = receipts_cfg.ledger_api_url
+        platform_url = platform_cfg.base_url
+        secret = platform_cfg.internal_eval_secret
 
-        poll_s = 3.0
-        try:
-            poll_s = float(os.getenv("POKER44_RECEIPTS_POLL_S") or "3.0")
-        except Exception:
-            poll_s = 3.0
-        poll_s = max(0.5, min(60.0, poll_s))
+        poll_s = receipts_cfg.poll_s
+        limit = receipts_cfg.limit
 
-        limit = 100
-        try:
-            limit = int(os.getenv("POKER44_RECEIPTS_LIMIT") or "100")
-        except Exception:
-            limit = 100
-        limit = max(1, min(500, limit))
-
-        validator_id = (os.getenv("POKER44_VALIDATOR_ID") or "").strip() or self.wallet.hotkey.ss58_address
+        validator_id = self.wallet.hotkey.ss58_address
         keypair = self.wallet.hotkey
 
         def _canon(obj: Dict[str, Any]) -> bytes:
