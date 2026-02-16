@@ -232,6 +232,7 @@ async def _run_forward_cycle(validator) -> None:
     # Prepare chunks and labels
     chunks = []  # List of batches (each batch is a list of hand dicts)
     batch_labels = []  # One label per batch
+    eval_hand_ids: List[str] = []
     
     for batch in batches:
         # Convert HandHistory objects to dicts
@@ -250,6 +251,13 @@ async def _run_forward_cycle(validator) -> None:
                         chunk_dicts.append(dataclasses.asdict(hand))
                     else:
                         chunk_dicts.append(hand.__dict__)
+
+        # Track eval hand tokens so we can mark them evaluated after scoring.
+        for h in chunk_dicts:
+            if isinstance(h, dict):
+                hid = str(h.get("hand_id") or "").strip()
+                if hid:
+                    eval_hand_ids.append(hid)
         
         chunks.append(chunk_dicts)
         
@@ -257,6 +265,10 @@ async def _run_forward_cycle(validator) -> None:
         # We need: 1=bot, 0=human
         batch_label = 0 if batch.is_human else 1
         batch_labels.append(batch_label)
+
+    # Deduplicate to keep the internal call small and idempotent.
+    if eval_hand_ids:
+        eval_hand_ids = sorted(set(eval_hand_ids))
     
     bt.logging.info(f"Processing {len(chunks)} chunks with labels: {batch_labels} (1=bot, 0=human)")
     bt.logging.info(f"Chunk sizes: {[len(chunk) for chunk in chunks]}")
@@ -441,6 +453,9 @@ async def _run_forward_cycle(validator) -> None:
         resp_meta_by_uid=resp_meta_by_uid,
     )
 
+    # Best-effort: mark these eval hand_ids as evaluated (post-miner scoring).
+    await _mark_eval_hand_ids_evaluated(hand_ids=eval_hand_ids)
+
     bt.logging.info(f"Rewards issued for {len(miner_uids)} queried miners.")
     bt.logging.info(
         f"[Forward #{validator.forward_count}] complete. Sleeping {validator.poll_interval}s before next tick.",
@@ -569,6 +584,42 @@ async def _post_cycle_metrics(
         await asyncio.to_thread(_do_post)
     except Exception:
         return
+
+
+async def _mark_eval_hand_ids_evaluated(*, hand_ids: List[str]) -> None:
+    """
+    Notify the platform backend that these eval hand tokens were evaluated.
+
+    The platform backend stores sanitized examples when they are reserved; we only
+    mark them evaluated after the validator has completed miner scoring for this cycle.
+    """
+    if not hand_ids:
+        return
+
+    platform_url = (os.getenv("POKER44_PLATFORM_BACKEND_URL") or "").strip().rstrip("/")
+    secret = (os.getenv("POKER44_INTERNAL_EVAL_SECRET") or "").strip()
+    if not platform_url or not secret:
+        return
+
+    url = f"{platform_url}/internal/eval/mark-evaluated"
+
+    def _do_post() -> None:
+        try:
+            requests.post(
+                url,
+                json={"hand_ids": hand_ids[:500]},
+                headers={"x-eval-secret": secret},
+                timeout=2.5,
+            )
+        except Exception:
+            # best-effort; ignore
+            pass
+
+    try:
+        await asyncio.to_thread(_do_post)
+    except Exception:
+        return
+
 
 async def _dendrite_with_retries(
     dendrite: bt.dendrite,
