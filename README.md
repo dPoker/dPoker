@@ -1,6 +1,6 @@
 <div align="center">
   <h1>🂡 <strong>poker44</strong> — Adversarial Bot Detection Subnet</h1>
-  <img src="poker44/assets/poker44.png" alt="poker44 logo" style="width:280px;height:280px;">
+  <img src="logo.png" alt="poker44 logo" style="width:280px;height:280px;">
   <p>
     <a href="docs/validator.md">🔐 Validator Guide</a> &bull;
     <a href="docs/miner.md">🛠️ Miner Guide</a> &bull;
