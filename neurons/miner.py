@@ -11,7 +11,7 @@ from typing import Tuple
 import bittensor as bt
 
 from poker44.base.miner import BaseMinerNeuron
-from poker44.validator.synapse import DetectionSynapse
+from poker44.protocol import DetectionSynapse
 
 
 class Miner(BaseMinerNeuron):

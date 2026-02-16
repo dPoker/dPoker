@@ -15,7 +15,7 @@ import numpy as np
 import requests
 
 from poker44.score.scoring import reward
-from poker44.validator.synapse import DetectionSynapse
+from poker44.protocol import DetectionSynapse
 
 from poker44.validator.constants import BURN_EMISSIONS, BURN_FRACTION, KEEP_FRACTION, UID_ZERO
 

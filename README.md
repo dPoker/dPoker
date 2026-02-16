@@ -125,6 +125,21 @@ Cross-platform behavioral analysis, automated dataset evolution, developer tooli
 
 ---
 
+## Quickstart (P2P Stack)
+
+- Validator guide: `docs/validator.md`
+- Miner guide: `docs/miner.md`
+- Protocol definitions: `poker44/protocol.py`
+
+Bring up a full **validator stack** locally (platform backend + indexer + validator neuron):
+
+```bash
+cd poker44-subnet
+bash scripts/validator/setup.sh
+```
+
+---
+
 ## Contributing
 
 poker44 is built **in public**.

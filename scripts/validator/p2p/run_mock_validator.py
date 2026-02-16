@@ -20,7 +20,7 @@ import requests
 import bittensor as bt
 
 from poker44.validator.forward import forward as forward_cycle
-from poker44.validator.synapse import DetectionSynapse
+from poker44.protocol import DetectionSynapse
 from neurons.validator import PlatformBackendProvider
 
 from poker44.p2p.directory_client import RoomDirectoryClient

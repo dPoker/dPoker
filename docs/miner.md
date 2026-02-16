@@ -1,18 +1,19 @@
 # 🛠️ poker44 Miner Guide
 
-poker44 treats miners as bot-hunters: your job is to classify chunks, where each chunk contain multiple batches and each batches are made up of multiple poker hands and then 
-return a bot classification result per batch. Validators curate labeled hands from a
-controlled poker environment & real human hands and reward miners who deliver
-accurate, low–false-positive predictions.
+Miners are bot-detection models. Validators send you **fresh, never-before-seen** poker behavior windows (grouped into chunks). You return a **bot risk score per chunk**.
 
-This guide covers how to keep your miner hotkey active while you score hands and
-how validators translate your responses into on-chain incentives.
+The wire protocol is defined in `poker44/protocol.py`.
 
 ---
 
-## 🚀 Quick start
+## Requirements
 
-## 🛠️ Install
+- Python 3.10/3.11
+- Bittensor installed (see `requirements.txt`)
+
+---
+
+## Install
 
 ```bash
 git clone <this-repo>
@@ -24,100 +25,50 @@ pip install -e .
 
 ---
 
-## 🔐 Wallet prep
-
-Create keys ahead of time so you can register the minute miner incentives go
-live:
+## Run (Testnet Example)
 
 ```bash
-btcli wallet new_coldkey --wallet.name my_cold
-btcli wallet new_hotkey  --wallet.name my_cold --wallet.hotkey my_poker44_hotkey
-```
-
----
-
-### Register on Testnet (netuid 401)
-
-```bash
-# Register your miner on poker44 subnet
-btcli subnet register \
-  --wallet.name my_cold \
-  --wallet.hotkey my_poker44_hotkey \
+pm2 start python --name poker44_miner -- \
+  ./neurons/miner.py \
   --netuid 401 \
-  --subtensor.network test
+  --wallet.name owner \
+  --wallet.hotkey miner1 \
+  --subtensor.network test \
+  --logging.debug
+```
 
-# Check registration status
-btcli wallet overview \
-   --wallet.name my_cold \
-   --subtensor.network test
+Or use the helper script: `scripts/miner/run/run_miner.sh`.
+
+---
+
+## Protocol: What You Receive / Return
+
+Validators call your axon with `DetectionSynapse`:
+
+- `synapse.chunks`: `list[list[dict]]`
+  - Each chunk is a list of hands.
+  - Each hand is a sanitized dict payload (no hidden cards).
+
+You must respond with:
+
+- `synapse.risk_scores`: `list[float]` (same length as `chunks`)
+- `synapse.predictions`: `list[bool]` (same length as `chunks`)
+
+Minimal stub:
+
+```python
+from poker44.protocol import DetectionSynapse
+
+async def forward(self, synapse: DetectionSynapse) -> DetectionSynapse:
+    n = len(synapse.chunks or [])
+    synapse.risk_scores = [0.5] * n
+    synapse.predictions = [False] * n
+    return synapse
 ```
 
 ---
 
----
+## Scoring (High Level)
 
-## ▶️ Run the loop
+Validators score miners on detection quality (rewarding strong signal, penalizing false positives). The exact metric evolves; your goal is consistent: maximize generalization to unseen bots without flagging humans.
 
-#### Run miner using script
-You want to run it with the help of bash script;
-Script for running the miner is at `scripts/miner/run/run_miner.sh`
-
-- Update the hotkey, coldkey, name, network as needed
-- Make the script executable: `chmod + x ./scripts/miner/run/run_miner.sh`
-- Run the script: `./scripts/miner/run/run_miner.sh`
-
-
-
-#### Logs:
-```
-pm2 logs poker44_miner
-```
-
-#### Stop / restart / delete:
-```
-pm2 stop poker44_miner
-
-pm2 restart poker44_miner
-
-pm2 delete poker44_miner
-```
-
-
----
-
-Keep the process running so validators can send canonical hand payloads to your
-axon. The reference miner ships with a simple heuristic model; swap in your own
-in `neurons/miner.py` for better scores.
-
-### What arrives in each request?
-
-Validators send a `DetectionSynapse` containing:
-
-- **Event log:** ordered actions with amounts, street, stack and pot states.
-- **Timing:** decision windows and optional client latency buckets.
-- **Context:** table/game metadata (blinds, seat map, format flags).
-- **Integrity:** bot provenance tags (for bots), session multi-tabling buckets.
-
-Return a probability in `[0,1]` plus a binary guess; risk scores closer to 1
-indicate “bot”.
-
----
-
-## 🧭 How miners earn now
-
-1. **Serve your axon.** Keep your node online so validators can hit it with
-   hand-history queries.
-2. **Return classification labels.** Miners are rewarded on F1, average precision,
-   and low false positives—err toward protecting humans.
-3. **Generalise.** Datasets evolve with harder, more human-like bots. Models that
-   adapt quickly keep their rewards as difficulty ramps.
-
----
-
-## 🤝 Contribute ideas
-
-- Share new heuristics/features that help catch bots without harming humans.  
-- Add adapters for new bot families or integrity signals.  
-- Stress-test the scoring loop with adversarial patterns.
-
-Keep your node online, push better models, and help keep poker tables fair. 🂡

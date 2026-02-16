@@ -25,7 +25,7 @@ import bittensor as bt
 
 from poker44.base.neuron import BaseNeuron
 from poker44.utils.config import add_miner_args
-from poker44.validator.synapse import DetectionSynapse
+from poker44.protocol import DetectionSynapse
 
 from typing import Union
 

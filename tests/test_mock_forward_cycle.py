@@ -7,7 +7,7 @@ import pytest
 
 from poker44.core.models import LabeledHandBatch
 from poker44.validator.forward import forward as forward_cycle
-from poker44.validator.synapse import DetectionSynapse
+from poker44.protocol import DetectionSynapse
 
 
 class StaticProvider:

@@ -1,160 +1,104 @@
-# 🔐 poker44 Validator Guide
+# 🔐 poker44 Validator Guide (P2P Stack)
 
-Welcome to poker44 – the poker anti-bot subnet with objective, evolving
-evaluation. This guide covers the lean validator scaffold introduced in v0.
+This subnet is evaluated on **fresh poker hands** generated inside **each validator's own room**. Validators must run their room isolated so miners and other validators cannot pre-see the hands used for evaluation.
 
-> **Goal for v0:** fetch fresh, consume-once hands from the **local platform backend**,
-> query miners, score them (F1-centric rewards), and push weights on-chain.
+This guide explains the **per-validator stack** we run in `p2p` mode:
 
----
+- **Platform backend** (Node): poker gameplay + Postgres/Redis + internal eval endpoints
+- **Indexer** (FastAPI): read API that verifies room announcements and serves a canonical directory view
+- **Validator neuron** (Python): pulls fresh eval batches, queries miners via Bittensor, scores, and sets weights
 
-## ✅ Requirements
-
-- Ubuntu 22.04+ (or any Linux with Python 3.10/3.11 available)
-- Python 3.10+
+The **Room Directory** is optional infrastructure (can be hosted centrally for MVP). It stores announcements; **signature verification happens in indexers/ledger**, not in the directory.
 
 ---
 
-## 🛠️ Install
+## Requirements
 
-```bash
-git clone <this-repo>
-cd poker44-subnet
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e .
-```
-
-___
-Validators automatically ingest the labeled hands provided by the poker44
-adapter. Human hands are chosen randomly out of massive dataset whereas bot hands are created on the fly to generate near perfect poker hands. No manual player list is required; the dataset already contains ground truth labels for bots and humans.
+- Python 3.10/3.11
+- Node 18+ and npm
+- Docker (for Postgres/Redis)
+- PM2 (`npm i -g pm2`)
 
 ---
 
-## Local Platform Backend (P2P Mode)
-
-For the decentralized setup, each validator runs its **own** poker platform backend (Postgres + Redis + gameplay)
-and pulls **fresh, consume-once** labeled batches from it.
-
-Set:
-
-```bash
-export POKER44_PROVIDER=platform
-export POKER44_PLATFORM_BACKEND_URL=http://localhost:3001
-export POKER44_INTERNAL_EVAL_SECRET=dev-internal-eval-secret
-# Optional:
-export POKER44_REQUIRE_MIXED=true   # require hands include both HUMAN and BOT seats
-export POKER44_AUTOSIMULATE=true   # dev helper: generate hands when buffer is empty
-
-# Optional: announce discoverable rooms (MVP directory)
-export POKER44_DIRECTORY_URL=http://localhost:8010
-export POKER44_DIRECTORY_SHARED_SECRET=dev-secret
-export POKER44_PLATFORM_PUBLIC_URL=http://localhost:3001
-```
-
-The backend must expose:
-- `GET /internal/eval/next?limit=10&requireMixed=true` (header `x-eval-secret`)
-- `POST /internal/eval/simulate` (dev helper to generate mixed hands)
-- `POST /internal/rooms/ensure` (ensure a discoverable room code exists)
-
-### One-command local stack
+## One-Command Setup (Validator Stack)
 
 From `poker44-subnet/`:
 
 ```bash
-chmod +x scripts/validator/p2p/setup.sh
-scripts/validator/p2p/setup.sh
+NETWORK=test NETUID=401 \
+VALIDATOR_WALLET=poker44-test VALIDATOR_HOTKEY=validator \
+POKER44_DIRECTORY_URL=http://127.0.0.1:8010 \
+bash scripts/validator/setup.sh
 ```
 
-To stop the local stack:
+Notes:
+
+- If `START_PORT` is not numeric (default is `rand`), the script picks a random free port range.
+- The script starts 3 PM2 processes: platform backend, indexer, and the validator neuron.
+
+To stop:
 
 ```bash
-chmod +x scripts/validator/p2p/stop.sh
-scripts/validator/p2p/stop.sh
+PM2_PREFIX=<printed-by-setup> bash scripts/deploy/pm2/down.sh
 ```
 
 ---
 
-### Register on Testnet (netuid 401)
+## Config (Environment Variables)
+
+The validator process **fails fast** on missing critical env vars.
+
+### Provider mode
+
+- `POKER44_PROVIDER=platform`
+  - Required:
+    - `POKER44_PLATFORM_BACKEND_URL` (set by the setup script)
+    - `POKER44_INTERNAL_EVAL_SECRET` (set by the setup script)
+
+### Room announcements (optional, but required for discovery)
+
+If you set `POKER44_DIRECTORY_URL`, the validator will announce a joinable room:
+
+- Required:
+  - `POKER44_DIRECTORY_URL`
+- Optional:
+  - `POKER44_VALIDATOR_NAME` (defaults to `poker44-validator`)
+  - `POKER44_PLATFORM_PUBLIC_URL` (defaults to `POKER44_PLATFORM_BACKEND_URL`)
+  - `POKER44_INDEXER_PUBLIC_URL` (used by UIs to choose a read API)
+  - `POKER44_ROOM_CODE` (if not set, the validator asks the platform backend to mint/ensure one)
+
+Announcements are **hotkey-signed**. If you set `POKER44_VALIDATOR_ID`, it must equal the hotkey SS58 address or the validator will exit.
+
+### Receipts forwarding (optional)
+
+If `POKER44_RECEIPTS_ENABLED=true`, the validator will forward signed hand receipts to a ledger/settlement API:
+
+- Required:
+  - `POKER44_LEDGER_API_URL`
+
+---
+
+## What The Validator Does Each Cycle
+
+1. Reserve **fresh, consume-once** eval examples from the platform backend (`/internal/eval/next`).
+2. Build protocol payloads and query miners using `DetectionSynapse` (`poker44/protocol.py`).
+3. Score miner responses and set weights on-chain.
+4. Mark reserved examples as evaluated (`/internal/eval/mark-evaluated`) so they can later be published (dataset gating).
+
+---
+
+## Debugging
+
+PM2 logs:
 
 ```bash
-# Register your validator on poker44 subnet
-btcli subnet register \
-  --wallet.name poker44-test \
-  --wallet.hotkey default \
-  --netuid 401 \
-  --subtensor.network test
-
-# Check registration status
-btcli wallet overview \
-   --wallet.name poker44-test \
-   --subtensor.network test
-```
----
-
-## ▶️ Run the loop
-
-
-#### Run validator using pm2
-```bash
-pm2 start python --name poker44_validator -- \
-  ./neurons/validator.py \
-  --netuid 401 \
-  --wallet.name poker44-test \
-  --wallet.hotkey default \
-  --subtensor.network test \
-  --logging.debug
+pm2 ls
+pm2 logs <process-name>
 ```
 
-#### Run validator using script
-If you want to run it with the help of bash script;
-Script for running the validator is at `scripts/validator/run/run_vali.sh`
+Health endpoints (ports depend on your `START_PORT` selection):
 
-- Update the hotkey, coldkey, name, network as needed
-- Make the script executable: `chmod + x ./scripts/validator/run/run_vali.sh`
-- Run the script: `./scripts/validator/run/run_vali.sh`
+- Platform backend: `GET /health/live`
+- Indexer: `GET /healthz`
 
-
-
-#### Logs:
-```
-pm2 logs poker44_validator
-```
-
-#### Stop / restart / delete:
-```
-pm2 stop poker44_validator
-
-pm2 restart poker44_validator
-
-pm2 delete poker44_validator
-```
-
-
-What happens each cycle:
-
-1. Labeled hands (actions, timing, integrity signals) are fetched.
-2. A batch is generated consisting of a single hand type & multiple batches are used to create a chunk. 
-3. Chunks are dispatched to miners; responses are scored with F1-heavy rewards.
-4. Rewards are logged and used to update weights; emissions are allocated with
-   a burn bias when no eligible miners respond.
-
-The script currently prints results and sleeps for `poll_interval` seconds before repeating.
-
----
-
-## 🧭 Road to full validator
-
-- ✅ poker44 ingestion + heuristic scoring loop
-- ⏳ Persist receipts + publish weights on-chain
-- ⏳ Held-out bot families + early-detection challenges
-- ⏳ Dashboarding and operator-facing APIs
-
-Track progress in [docs/roadmap.md](roadmap.md).
-
----
-
-## 🆘 Help
-
-- Open an issue on GitHub for bugs or missing APIs.
-- Reach us on Discord (@sachhp) for any doubts.
