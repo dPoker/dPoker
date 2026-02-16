@@ -75,6 +75,13 @@ def add_args(cls, parser: argparse.ArgumentParser) -> None:
     )
 
 def add_validator_args(cls, parser: argparse.ArgumentParser) -> None:
+    # Name helps place logs/state under ~/.bittensor/.../<neuron.name>.
+    parser.add_argument(
+        "--neuron.name",
+        type=str,
+        default="validator",
+        help="Neuron name used for local state/log path segmentation.",
+    )
     parser.add_argument(
         "--validator.manual_players",
         nargs="*",
@@ -84,6 +91,12 @@ def add_validator_args(cls, parser: argparse.ArgumentParser) -> None:
 
 
 def add_miner_args(cls, parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--neuron.name",
+        type=str,
+        default="miner",
+        help="Neuron name used for local state/log path segmentation.",
+    )
     parser.add_argument(
         "--miner.mock",
         action="store_true",

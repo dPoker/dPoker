@@ -34,7 +34,7 @@ import requests
 
 from poker44 import __version__
 from poker44.base.validator import BaseValidatorNeuron
-from poker44.utils.config import config
+from poker44.bittensor_config import config as bittensor_config
 from poker44.core.hand_json import from_standard_json
 from poker44.core.models import LabeledHandBatch
 from poker44.validator.forward import forward as forward_cycle
@@ -224,13 +224,14 @@ class PlatformBackendProvider:
 class Validator(BaseValidatorNeuron):
     """poker44 validator neuron wired into the BaseValidator scaffold."""
 
-    def __init__(self):
-        cfg = config(Validator)
+    def __init__(self, config=None):
+        cfg = config or bittensor_config(role="validator")
         super().__init__(config=cfg)
         bt.logging.info(f"🚀 poker44 Validator v{__version__} started")
 
         self.forward_count = 0
-        self.settings = cfg
+        # Convenience alias for config fields.
+        self.settings = self.config
         
         provider_mode = (os.getenv("POKER44_PROVIDER") or "local_generated").strip().lower()
         self._validate_env_or_die(provider_mode)
@@ -255,7 +256,7 @@ class Validator(BaseValidatorNeuron):
             labeled_chunks = generate_dataset_array(include_labels=True)
             self.provider = GeneratedDatasetProvider(labeled_chunks, shuffle=True, loop=True)
 
-        self.poll_interval = self.settings.poll_interval_seconds
+        self.poll_interval = int(getattr(self.settings, "poll_interval_seconds", 60))
         self.prediction_buffer = {}
         self.label_buffer = {}
 
@@ -567,7 +568,8 @@ class Validator(BaseValidatorNeuron):
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution
-    with Validator() as validator:
+    cfg = bittensor_config(role="validator")
+    with Validator(config=cfg) as validator:
         while True:
             bt.logging.info(f"Validator running... {time.time()}")
             time.sleep(100)

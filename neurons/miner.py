@@ -11,6 +11,7 @@ from typing import Tuple
 import bittensor as bt
 
 from poker44.base.miner import BaseMinerNeuron
+from poker44.bittensor_config import config as bittensor_config
 from poker44.protocol import DetectionSynapse
 
 
@@ -91,7 +92,8 @@ class Miner(BaseMinerNeuron):
 
 
 if __name__ == "__main__":
-    with Miner() as miner:
+    cfg = bittensor_config(role="miner")
+    with Miner(config=cfg) as miner:
         bt.logging.info("Random miner running...")
         while True:
             bt.logging.info(f"Miner UID: {miner.uid} | Incentive: {miner.metagraph.I[miner.uid]}")

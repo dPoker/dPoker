@@ -9,6 +9,7 @@ from typing import List
 
 import bittensor as bt
 from poker44.base.validator import BaseValidatorNeuron
+from poker44.bittensor_config import config as bittensor_config
 from poker44.constants import SAMPLE_K
 
 
@@ -52,8 +53,8 @@ class Validator(BaseValidatorNeuron):
 
 # ╭────────────────── production keep‑alive (optional) ──────────────────╮
 if __name__ == "__main__":
-
-    with Validator() as validator:
+    cfg = bittensor_config(role="validator")
+    with Validator(config=cfg) as validator:
         while True:
             bt.logging.info(f"Validator running... {time.time()}")
             time.sleep(5)
